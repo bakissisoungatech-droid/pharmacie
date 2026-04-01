@@ -5,6 +5,7 @@ function SaisieResultat() {
   const [attente, setAttente] = useState([]);
   const [selectedExamen, setSelectedExamen] = useState(null);
   const [validePar, setValidePar] = useState("");
+  const [parametres, setParametres] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   // États pour les formulaires spécifiques
@@ -34,9 +35,6 @@ function SaisieResultat() {
     aspect: ["Opalescent", "Hétérogène", "Citrin"]
   };
 
-  const [parametres, setParametres] = useState([
-    { nom: "", valeur: "", unite: "", normale: "", interpretation: "" }
-  ]);
 
   const UNITES_LABO = ["", "g/L", "mg/dL", "mmol/L", "µmol/L", "UI/L", "g/dL", "mm/1h", "pg", "fl", "10^3/µL", "10^6/µL", "%", "mg/L"];
 
@@ -64,33 +62,30 @@ function SaisieResultat() {
     if (selectedExamen) {
       const cat = (selectedExamen.categorie || "").toLowerCase();
       
-      // On extrait les paramètres peu importe la catégorie
-      const sourceParams = selectedExamen.parametre || selectedExamen.parametres_defaut || "";
+      // Récupération des noms des paramètres et des valeurs/unités par défaut
+      const nomsParams = selectedExamen.parametre ? selectedExamen.parametre.split(',') : [];
+      const valeursDef = selectedExamen.valeurs_defaut ? selectedExamen.valeurs_defaut.split(',') : [];
 
-      if (sourceParams && sourceParams.includes(',')) {
-        // Cas multi-paramètres (ex: LMS, LMD, MDC)
-        const liste = sourceParams.split(',').map(p => {
-          const nomTrim = p.trim();
+      if (nomsParams.length > 0) {
+        // On génère exactement le nombre de lignes prévues dans le catalogue
+        const configurationAuto = nomsParams.map((nom, index) => {
+          const nomTrim = nom.trim();
           const ref = REFERENTIEL_NORMES[nomTrim] || { unite: "", normale: "" };
+          
           return {
             nom: nomTrim,
-            valeur: "",
-            unite: ref.unite,
+            valeur: "", 
+            // Si une valeur par défaut existe (ex: "Négatif"), on l'utilise, sinon vide
+            valeur_suggeree: valeursDef[index] ? valeursDef[index].trim() : "",
+            unite: ref.unite, // On garde l'unité en mémoire vive pour l'affichage
             normale: ref.normale,
             interpretation: ""
           };
         });
-        setParametres(liste);
-      } else if (sourceParams) {
-        // Cas paramètre unique
-        const ref = REFERENTIEL_NORMES[sourceParams] || { unite: "", normale: "" };
-        setParametres([{ 
-          nom: sourceParams, 
-          valeur: "", 
-          unite: ref.unite, 
-          normale: ref.normale,
-          interpretation: ""
-        }]);
+        setParametres(configurationAuto);
+      } else {
+        // Si aucun paramètre n'est défini (Saisie libre), on met une ligne vide
+        setParametres([{ nom: "", valeur: "", unite: "", normale: "", interpretation: "" }]);
       }
     }
   }, [selectedExamen]);
@@ -318,12 +313,9 @@ function SaisieResultat() {
 // 2. Rendu du Formulaire Spécifique Hématologie (ajouté)
 const renderFormulaireDynamique = () => {
   if (!selectedExamen || !selectedExamen.categorie) return null;
-  const cat = selectedExamen.categorie.toLowerCase();
+    const cat = selectedExamen.categorie.toLowerCase();
 
-  
-
-  // CAS : PARASITOLOGIE / COPROLOGIE
-  if (cat.includes("parasito") || cat.includes("copro")) {
+    if (cat.includes("parasito") || cat.includes("copro")) {
     return (
       <div className="p-3 border rounded bg-success bg-opacity-10">
         <h6 className="fw-bold text-success">💩 Examen Parasitologique / Coprologie</h6>
@@ -466,92 +458,72 @@ const renderFormulaireDynamique = () => {
     );
   }
 
-  // CAS PAR DEFAUT : BIOCHIMIE / HEMATOLOGIE (Tableau classique)
-  return (
-    <div>
-      {cat.includes("hématologie") && (
-        <div className="mb-3">
+ // CAS PAR DÉFAUT (Biochimie, etc.)
+    return (
+      <div>
+        {cat.includes("hématologie") && (
           <textarea 
-            className="form-control mb-2" 
+            className="form-control mb-3" 
             placeholder="Observations Frottis..." 
             onChange={e => setHematoData({...hematoData, obs: e.target.value})} 
           />
-        </div>
-      )}
-      {renderTableauSaisie()}
-    </div>
-  );
+        )}
+        {renderTableauSaisie()}
+      </div>
+    );
 };
 
 const renderTableauSaisie = () => (
-  <div className="table-responsive">
-    <table className="table table-bordered align-middle">
-      <thead className="table-light">
-        <tr>
-          <th>Paramètre</th>
-          <th>Valeur</th>
-          <th>Unité</th>
-          <th>Normes</th>
-          <th>Interprétation</th>
-        </tr>
-      </thead>
-      <tbody>
-        {parametres.map((p, index) => (
-          <tr key={index}>
-            <td>
-              <input 
-                list="liste-parametres"
-                className="form-control form-control-sm" 
-                value={p.nom} 
-                onChange={(e) => handleParamChange(index, 'nom', e.target.value)} 
-              />
-            </td>
-            <td>
-              <input 
-                type="text" 
-                className="form-control form-control-sm fw-bold" 
-                value={p.valeur} 
-                onChange={(e) => handleParamChange(index, 'valeur', e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                autoFocus={index === parametres.length - 1}
-              />
-            </td>
-            <td>
-              <input 
-                list="liste-unites"
-                className="form-control form-control-sm" 
-                value={p.unite} 
-                onChange={(e) => handleParamChange(index, 'unite', e.target.value)} 
-              />
-            </td>
-            <td>
-              <input 
-                className="form-control form-control-sm text-muted" 
-                value={p.normale} 
-                onChange={(e) => handleParamChange(index, 'normale', e.target.value)} 
-              />
-            </td>
-            <td>
-              <select 
-                className="form-select form-select-sm" 
-                value={p.interpretation} 
-                onChange={(e) => handleParamChange(index, 'interpretation', e.target.value)}
-              >
-                <option value="">-</option>
-                <option value="Normal" className="text-success">Normal</option>
-                <option value="Elevé" className="text-danger">Elevé</option>
-                <option value="Bas" className="text-warning">Bas</option>
-              </select>
-            </td>
+    <div className="table-responsive">
+      <table className="table table-bordered align-middle">
+        <thead className="table-light">
+          <tr>
+            <th style={{ width: '30%' }}>Paramètre</th>
+            <th>Résultat / Valeur</th>
+            <th>Normes & Unité</th>
+            <th>Interprétation</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
-    <button type="button" className="btn btn-sm btn-outline-primary" onClick={ajouterParametre}>
-      + Ajouter une ligne
-    </button>
-  </div>
-);
+        </thead>
+        <tbody>
+          {parametres.map((p, index) => (
+            <tr key={index}>
+              <td className="fw-bold text-secondary">{p.nom || "Paramètre libre"}</td>
+              <td>
+                <div className="input-group input-group-sm">
+                  <input 
+                    type="text" 
+                    className="form-control fw-bold border-primary" 
+                    value={p.valeur} 
+                    onChange={(e) => handleParamChange(index, 'valeur', e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, index)}
+                  />
+                  {p.unite && <span className="input-group-text bg-white text-muted">{p.unite}</span>}
+                </div>
+              </td>
+              <td className="small text-muted">{p.normale} {p.unite}</td>
+              <td>
+                <select 
+                  className={`form-select form-select-sm ${p.interpretation === 'Normal' ? 'text-success' : 'text-danger'}`}
+                  value={p.interpretation} 
+                  onChange={(e) => handleParamChange(index, 'interpretation', e.target.value)}
+                >
+                  <option value="">-</option>
+                  <option value="Normal">Normal</option>
+                  <option value="Elevé">Elevé</option>
+                  <option value="Bas">Bas</option>
+                </select>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!selectedExamen?.parametre && (
+        <button type="button" className="btn btn-sm btn-outline-primary" onClick={ajouterParametre}>
+          + Ajouter un paramètre
+        </button>
+      )}
+    </div>
+  );
   return (
   <div className="container-fluid mt-4">
     {/* DATALISTS pour l'auto-complétion */}

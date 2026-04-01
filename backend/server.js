@@ -17,6 +17,7 @@ require("./socket")(io);
 // routes
 app.use("/api/patient", require("./routes/patient"));
 app.use("/api/parameteur", require("./routes/parameteur"));
+app.use("/api/consultation", require("./routes/consultation"));
 app.use("/api/examen", require("./routes/examens"));
 app.use("/api/demande", require("./routes/demande"));
 app.use("/api/demande_examen", require("./routes/demande"));

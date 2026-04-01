@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import PatientsCRUD from "./pages/patientsCRUD";
 import ExamenCRUD from "./pages/examensCRUD";
+import Consultation from "./pages/consultation";
 import DemandeMedecin from "./pages/DemandeMedecin";
 import LaboDemandes from "./pages/LaboDemandes";
 import Dashboard from "./pages/dashboard";
@@ -10,7 +11,6 @@ import Parameteur from "./pages/parameteur";
 import DemandeExamen from "./pages/DemandeExamen";
 import DemandeExamen1 from "./pages/DemandeExamen1";
 import SaisieResultat from "./pages/Resultat";
-import ConsultationResultats from "./pages/consultationResultats";
 import ListeResultatsGroupes from "./pages/consultationResultats";
 
 function Gestion() {
@@ -23,6 +23,8 @@ function Gestion() {
         return <Dashboard />;
       case "utilisateurs":
         return <Inscription />;
+      case "consultation":
+        return <Consultation />;
       case "patients":
         return <PatientsCRUD />;
       case "parameteur":
@@ -135,10 +137,10 @@ function Gestion() {
 
           <li>
             <button
-              onClick={() => setActivePage("consultationResultats")}
+              onClick={() => setActivePage("consultation")}
               className="nav-link text-white btn btn-link"
             >
-              consultationResultats
+              consultation
             </button>
           </li>
 

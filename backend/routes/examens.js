@@ -3,23 +3,26 @@ const pool = require("../db");
 
 // --- CRÉATION ---
 router.post("/post", async (req, res) => {
-  const { nom_examen, categorie, parametre, valeurs_defaut, sous_categories, examens_inclus } = req.body;
+  // Ajout de prix et resultat dans la déstructuration
+  const { nom_examen, categorie, parametre, valeurs_defaut, sous_categories, examens_inclus, prix, resultat } = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // On insère sans la colonne type_resultat
+    // Insertion avec les nouvelles colonnes
     const newExamen = await client.query(
-      `INSERT INTO examen(nom_examen, categorie, parametre, valeurs_defaut, sous_categories) 
-       VALUES($1, $2, $3, $4, $5) RETURNING *`,
-      [nom_examen, categorie, parametre, valeurs_defaut, sous_categories]
+      `INSERT INTO examen(nom_examen, categorie, parametre, valeurs_defaut, sous_categories, prix, resultat) 
+       VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [nom_examen, categorie, parametre, valeurs_defaut, sous_categories, prix, resultat]
     );
 
     const id_nouveau = newExamen.rows[0].id_examen;
 
-    // Logique Bilan basée sur la catégorie reçue
+    // Logique Bilan
     if (categorie === 'BILAN' && Array.isArray(examens_inclus)) {
       for (let id_affilie of examens_inclus) {
+        // Note: Si votre table bilan_composition a aussi une colonne prix, 
+        // vous pouvez l'ajouter ici si nécessaire, sinon on utilise le prix global du bilan.
         await client.query(
           `INSERT INTO bilan_composition (id_bilan, id_examen_affilie) VALUES ($1, $2)`,
           [id_nouveau, id_affilie]
@@ -39,21 +42,19 @@ router.post("/post", async (req, res) => {
 
 // --- MISE À JOUR ---
 router.put("/:id", async (req, res) => {
-  const { nom_examen, categorie, parametre, valeurs_defaut, sous_categories, examens_inclus } = req.body;
+  const { nom_examen, categorie, parametre, valeurs_defaut, sous_categories, examens_inclus, prix, resultat } = req.body;
   const id_examen = req.params.id;
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    // Mise à jour simplifiée (sans type_resultat)
     const r = await client.query(
-      `UPDATE examen SET nom_examen=$1, categorie=$2, valeurs_defaut=$3, parametre=$4, sous_categories=$5 
-       WHERE id_examen=$6 RETURNING *`,
-      [nom_examen, categorie, valeurs_defaut, parametre, sous_categories, id_examen]
+      `UPDATE examen SET nom_examen=$1, categorie=$2, valeurs_defaut=$3, parametre=$4, sous_categories=$5, prix=$6, resultat=$7 
+       WHERE id_examen=$8 RETURNING *`,
+      [nom_examen, categorie, valeurs_defaut, parametre, sous_categories, prix, resultat, id_examen]
     );
 
-    // Rafraîchissement des affiliations si c'est un BILAN
     if (categorie === 'BILAN') {
       await client.query(`DELETE FROM bilan_composition WHERE id_bilan = $1`, [id_examen]);
       if (Array.isArray(examens_inclus)) {

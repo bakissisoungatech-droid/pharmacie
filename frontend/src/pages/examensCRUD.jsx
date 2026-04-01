@@ -12,6 +12,8 @@ function ExamenCRUD() {
   const [isBilanMode, setIsBilanMode] = useState(false);
   const [examensInclus, setExamensInclus] = useState([]); // IDs des examens à affilier
   const [valeursDefaut, setValeursDefaut] = useState("");
+  const [prix, setPrix] = useState("");
+  const [resultat, setResultat] = useState("");
 
   const [searchBilan, setSearchBilan] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,17 +62,19 @@ function ExamenCRUD() {
     return [...new Set(data.map(ex => ex.categorie))].filter(Boolean);
   }, [data]);
 
+  // Mise à jour du Submit
   const submit = async (e) => {
     e.preventDefault();
 
-    // Le payload est maintenant très simple
     const payload = { 
       nom_examen: nomExamen, 
-      categorie: isBilanMode ? "BILAN" : categorie, // On force "BILAN" si le mode est activé
-      parametre: isBilanMode ? "" : parametre,     // Un bilan n'a pas de paramètres propres
+      categorie: isBilanMode ? "BILAN" : categorie, 
+      parametre: isBilanMode ? "" : parametre,     
       valeurs_defaut: isBilanMode ? "" : valeursDefaut,
       sous_categories: sousCategories,
-      examens_inclus: isBilanMode ? examensInclus : []
+      examens_inclus: isBilanMode ? examensInclus : [],
+      prix: prix,       // Nouveau champ
+      resultat: resultat // Nouveau champ
     };
 
     try {
@@ -94,6 +98,8 @@ function ExamenCRUD() {
     setSousCategories(ex.sous_categories || "");
     setParametre(ex.parametre || "");
     setValeursDefaut(ex.valeurs_defaut || "");
+    setPrix(ex.prix || "");      // Charger le prix
+    setResultat(ex.resultat || ""); // Charger le résultat
 
     if (ex.categorie === 'BILAN') {
       setIsBilanMode(true);
@@ -111,7 +117,9 @@ function ExamenCRUD() {
     setCategorie("");
     setSousCategories("");
     setParametre("");
-    setValeursDefaut(""); // Nettoie le nouveau champ
+    setValeursDefaut("");
+    setPrix("");     // Reset
+    setResultat(""); // Reset
     setEditId(null);
     setExamensInclus([]);
     setIsBilanMode(false);
@@ -258,6 +266,32 @@ function ExamenCRUD() {
           </div>
         </div>
       )}
+
+      <div className="row mb-3">
+        {!isBilanMode && (
+          <div className="col-md-6">
+            <label className="form-label fw-bold">Unité / Résultat par défaut</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              value={resultat} 
+              onChange={(e) => setResultat(e.target.value)} 
+              placeholder="Ex: Négatif ou mg/L"
+            />
+          </div>
+        )}
+
+        <div className="col-md-6">
+          <label className="form-label fw-bold">Prix (FCFA)</label>
+          <input 
+            type="number" 
+            className="form-control" 
+            value={prix} 
+            onChange={(e) => setPrix(e.target.value)} 
+            placeholder="Ex: 5000"
+          />
+        </div>
+      </div>
       </div>
 
       <div className="d-flex gap-2 mt-3">
@@ -288,6 +322,7 @@ function ExamenCRUD() {
             <tr>
               <th>Examen</th>
               <th>Configuration (Paramètre : Valeur)</th>
+              <th>prix</th>
               <th className="text-center">Actions</th>
             </tr>
           </thead>
@@ -318,6 +353,9 @@ function ExamenCRUD() {
                     ) : (
                       <span className="text-muted small italic">Saisie libre</span>
                     )}
+                  </td>
+                  <td>
+                    <div className="fw-bold">{ex.prix}</div>
                   </td>
                   <td className="no-print">
                     <div className="btn-group">
