@@ -49,6 +49,8 @@ router.put("/:id", async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // On enregistre "resultat" tel quel. S'il contient "Positif, Négatif", 
+    // c'est ce qui sera stocké pour les examens multi-paramètres.
     const r = await client.query(
       `UPDATE examen SET nom_examen=$1, categorie=$2, valeurs_defaut=$3, parametre=$4, sous_categories=$5, prix=$6, resultat=$7 
        WHERE id_examen=$8 RETURNING *`,

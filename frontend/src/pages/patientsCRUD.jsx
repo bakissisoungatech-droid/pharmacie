@@ -5,11 +5,13 @@ import socket from "../socket";
 function PatientsCRUD() {
   const [data, setData] = useState([]);
   const [listeAbonnements, setListeAbonnements] = useState([]);
+  const [listeConsultation, setListeConsultation] = useState([]);
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
   const [sexe, setSexe] = useState("Masculin");
   const [telephone, setTelephone] = useState("");
   const [idAbonnement, setIdAbonnement] = useState("");
+  const [idConsultation, setIdConsultation] = useState("");
   const [editId, setEditId] = useState(null);
 
   // --- Nouveaux états : Recherche, Filtres et Tri ---
@@ -36,16 +38,28 @@ function PatientsCRUD() {
     }
   }, []);
 
+  const loadConsultations = useCallback(async () => {
+    try {
+      const r = await axios.get(`http://localhost:3000/api/consultation/affiche`);
+      setListeConsultation(r.data);
+    } catch (error) {
+      console.error("Erreur abonnements", error);
+    }
+  }, []);
+
   useEffect(() => {
     loadPatients();
     loadAbonnements();
+    loadConsultations();
     socket.on("patients_updated", loadPatients);
     socket.on("abonnement_updated", loadAbonnements);
+    socket.on("consultation_updated", loadConsultations);
     return () => {
       socket.off("patients_updated", loadPatients);
       socket.off("abonnement_updated", loadAbonnements);
+      socket.off("consultation_updated", loadConsultations);
     };
-  }, [loadPatients, loadAbonnements]);
+  }, [loadPatients, loadAbonnements, loadConsultations]);
 
   // --- Logique de Tri ---
   const requestSort = (key) => {
@@ -105,7 +119,17 @@ function PatientsCRUD() {
 
   const submit = async (e) => {
     e.preventDefault();
-    const payload = { nom, prenom, sexe, telephone, abonne: idAbonnement || "non" };
+    
+    // On s'assure que le payload correspond exactement aux variables du backend
+    const payload = { 
+      nom, 
+      prenom, 
+      sexe, 
+      telephone, 
+      abonne: idAbonnement || "non", 
+      consultation: idConsultation // On envoie le texte directement
+    };
+
     try {
       if (editId) {
         await axios.put(`http://localhost:3000/api/patient/${editId}`, payload);
@@ -114,18 +138,29 @@ function PatientsCRUD() {
       }
       resetForm();
       loadPatients();
-    } catch (error) { console.error("Erreur envoi", error); }
+      alert("Patient enregistré avec succès !");
+    } catch (error) { 
+      console.error("Erreur envoi", error.response?.data || error.message); 
+    }
+  };
+
+  const edit = (p) => {
+    setNom(p.nom); 
+    setPrenom(p.prenom); 
+    setSexe(p.sexe);
+    setTelephone(p.telephone); 
+    setIdAbonnement(p.abonne || "");
+    
+    // Ici p.consultation contient maintenant du texte (ex: "Pédiatrie")
+    setIdConsultation(p.consultation || ""); 
+    
+    setEditId(p.id_patient);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const resetForm = () => {
     setNom(""); setPrenom(""); setSexe("Masculin");
-    setTelephone(""); setIdAbonnement(""); setEditId(null);
-  };
-
-  const edit = (p) => {
-    setNom(p.nom); setPrenom(p.prenom); setSexe(p.sexe);
-    setTelephone(p.telephone); setIdAbonnement(p.abonne || "");
-    setEditId(p.id_patient);
+    setTelephone(""); setIdAbonnement(""); setIdConsultation(""); setEditId(null);
   };
 
   const handleArchive = async (id) => {
@@ -173,9 +208,25 @@ function PatientsCRUD() {
           </div>
           <div className="col-md-2 mb-2"><input className="form-control" placeholder="Tél" value={telephone} onChange={(e)=>setTelephone(e.target.value)} /></div>
           <div className="col-md-2 mb-2">
-            <select className="form-select" value={idAbonnement} onChange={(e)=>setIdAbonnement(e.target.value)}>
-              <option value="">Standard</option>
-              {listeAbonnements.map(abo => <option key={abo.id_abonnement} value={abo.nom}>{abo.nom}</option>)}
+            <select 
+              className="form-select" 
+              value={idAbonnement} 
+              onChange={(e) => setIdAbonnement(e.target.value)}
+            >
+              {listeAbonnements.map(abo => (
+                <option key={abo.id_abonnement} value={abo.nom}>{abo.nom}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-2 mb-2">
+            <select 
+              className="form-select" 
+              value={idConsultation} // Utilise l'état consultation
+              onChange={(e) => setIdConsultation(e.target.value)} // Met à jour l'état consultation
+            >
+              {listeConsultation.map(consul => (
+                <option key={consul.id} value={consul.nom_consul}>{consul.nom_consul}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -216,6 +267,7 @@ function PatientsCRUD() {
               <th>Sexe</th>
               <th>Téléphone</th>
               <th>Abonnement</th>
+              <th>Consultation</th>
               <th onClick={()=>requestSort("date_creation")} style={{cursor:'pointer'}}>Enregistré le {sortConfig.key==="date_creation" && (sortConfig.direction==="asc"?"↑":"↓")}</th>
               <th className="no-print">Actions</th>
             </tr>
@@ -227,6 +279,11 @@ function PatientsCRUD() {
                 <td>{p.sexe}</td>
                 <td>{p.telephone}</td>
                 <td><span className={`badge ${p.abonne === "non" ? "bg-secondary" : "bg-success"}`}>{p.abonne}</span></td>
+                <td>
+                  <span className={`badge ${p.consultation === "laboratoire" ? "bg-secondary" : "bg-info text-dark"}`}>
+                    {p.consultation }
+                  </span>
+                </td>
                 <td>{new Date(p.date_creation).toLocaleDateString()}</td>
                 <td className="no-print">
                   <div className="btn-group">

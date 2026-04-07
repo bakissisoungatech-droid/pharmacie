@@ -21,7 +21,7 @@ function Consultation() {
                 await axios.put(`http://localhost:3000/api/consultation/${editId}`, formData);
             } else {
                 // MODE CRÉATION
-                await axios.post("http://localhost:3000/api/consultation", formData);
+                await axios.post("http://localhost:3000/api/consultation/post", formData);
             }
             setFormData({ nom_consul: "", prix: "" });
             setEditId(null);

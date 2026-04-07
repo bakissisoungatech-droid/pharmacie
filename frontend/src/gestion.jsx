@@ -146,6 +146,15 @@ function Gestion() {
 
           <li>
             <button
+              onClick={() => setActivePage("consultationResultats")}
+              className="nav-link text-white btn btn-link"
+            >
+              consultation resultat
+            </button>
+          </li>
+
+          <li>
+            <button
               onClick={() => setActivePage("utilisateurs")}
               className="nav-link text-white btn btn-link"
             >

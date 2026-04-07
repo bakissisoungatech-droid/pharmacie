@@ -58,6 +58,11 @@ function DemandeExamen() {
     } catch (err) { console.error("Erreur détails", err); }
   };
 
+  // Calcule le total des examens pour l'affichage dans le modal
+  const totalDemande = useMemo(() => {
+    return lignesDetail.reduce((sum, ligne) => sum + Number(ligne.prix_applique || 0), 0);
+  }, [lignesDetail]);
+
   const filteredDemandes = useMemo(() => {
     let result = demandes.filter((d) => {
       const dateD = new Date(d.date_demande);
@@ -419,10 +424,16 @@ function DemandeExamen() {
                     {lignesDetail.map((l, index) => (
                       <div key={index} className="list-group-item d-flex justify-content-between align-items-center bg-transparent border-0 px-0">
                         <span><i className="bi bi-check2-circle text-success me-2"></i> {l.nom_examen}</span>
-                        <span className="badge rounded-pill bg-secondary">{l.categorie}</span>
+                        {/* Affichage du prix de la ligne */}
+                        <span className="fw-bold">{Number(l.prix_applique).toLocaleString()} FCFA</span>
                       </div>
                     ))}
-                    {lignesDetail.length === 0 && <p className="text-muted">Chargement des examens...</p>}
+                  </div>
+
+                  {/* Affichage du TOTAL */}
+                  <div className="d-flex justify-content-between p-3 bg-dark text-white rounded">
+                    <h5 className="mb-0">MONTANT TOTAL :</h5>
+                    <h5 className="mb-0">{totalDemande.toLocaleString()} FCFA</h5>
                   </div>
                 </>
               )}

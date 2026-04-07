@@ -51,17 +51,26 @@ function ListeResultatsGroupes() {
       dossiers[cleDossier].categories[catNom][sousCatNom].push(ligne);
     });
 
+    // Remplace ton bloc filter dans useMemo par celui-ci :
     return Object.values(dossiers).filter(d => {
-    const matchNom = `${d.infosPatient.nom} ${d.infosPatient.prenom}`.toLowerCase().includes(search.toLowerCase());
-    
-    // Si aucune date n'est sélectionnée, on laisse passer. 
-    // Sinon on compare le format YYYY-MM-DD
-    const dateDossier = new Date(d.infosPatient.date).toISOString().split('T')[0];
-    const matchDate = filterDate === "" || dateDossier === filterDate;
+        // Sécurité Nom
+        const nomComplet = `${d.infosPatient.nom || ""} ${d.infosPatient.prenom || ""}`.toLowerCase();
+        const matchNom = nomComplet.includes(search.toLowerCase());
+        
+        // Sécurité Date
+        let matchDate = true;
+        if (filterDate !== "" && d.infosPatient.date) {
+            try {
+                const dateDossier = new Date(d.infosPatient.date).toISOString().split('T')[0];
+                matchDate = dateDossier === filterDate;
+            } catch (e) {
+                matchDate = false;
+            }
+        }
 
-    return matchNom && matchDate;
-  });
-}, [resultats, search, filterDate]);
+        return matchNom && matchDate;
+    });
+    }, [resultats, search, filterDate]);
   
 
   const imprimerDossier = (groupe) => {
@@ -138,13 +147,12 @@ function ListeResultatsGroupes() {
                             </tr>
                           </thead>
                           <tbody className="small">
-                            {examens.map((ex, i) => (
-                              <tr key={i} className="text-center">
-                                <td className="text-start fw-bold">{ex.nom_examen}</td>
+                            {examens.map((ex, l) => (
+                              <tr key={l}>
+                                {/* Utilise les nouveaux noms de colonnes définis dans le SQL */}
                                 <td>{ex.nom_parametre}</td>
-                                <td className="fw-bold">{ex.valeur}</td>
-                                <td>{ex.unite}</td>
-                                <td className="text-muted">{ex.valeur_normale}</td>
+                                <td className="fw-bold">{ex.valeur_resultat}</td>
+                                <td className="text-muted small">{ex.norme_reference}</td>
                               </tr>
                             ))}
                           </tbody>

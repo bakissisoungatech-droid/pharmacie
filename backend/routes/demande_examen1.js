@@ -33,14 +33,13 @@ router.put("/valider/:id", async (req, res) => {
 
 // 3. ENREGISTRER (Transactionnelle)
 router.post("/post", async (req, res) => {
-  // Extraction des données envoyées par le frontend
   const { id_patient, medecin, examens, constantes, interpretation } = req.body; 
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    // 1. Créer la demande (Le Parent)
+    // 1. Créer la demande
     const resD = await client.query(
       `INSERT INTO demande_examen (id_patient, medecin, interpretation, statut) 
        VALUES ($1, $2, $3, 'en_attente') RETURNING id_demande`,
@@ -49,13 +48,13 @@ router.post("/post", async (req, res) => {
     
     const id_demande = resD.rows[0].id_demande;
 
-    // 2. Insérer chaque examen (Les Lignes)
-    // ATTENTION : "examens" doit être un tableau d'identifiants [1, 2, 3]
+    // 2. Insérer chaque examen avec son prix actuel (Photographie du prix)
     if (examens && examens.length > 0) {
       for (const id_ex of examens) {
+        // Cette requête insère l'id_demande et va chercher le prix dans la table examen
         await client.query(
-          `INSERT INTO demande_examen_ligne (id_demande, id_examen) 
-           VALUES ($1, $2)`,
+          `INSERT INTO demande_examen_ligne (id_demande, id_examen, prix_applique) 
+           SELECT $1, id_examen, prix FROM examen WHERE id_examen = $2`,
           [id_demande, id_ex]
         );
       }
@@ -68,8 +67,7 @@ router.post("/post", async (req, res) => {
 
   } catch (err) {
     await client.query('ROLLBACK');
-    // TRÈS IMPORTANT : Regardez votre terminal Node.js pour lire ce message
-    console.error("ERREUR SERVEUR (POST /post):", err.message);
+    console.error("ERREUR:", err.message);
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
@@ -78,14 +76,13 @@ router.post("/post", async (req, res) => {
 
 // 3. ENREGISTRER (Transactionnelle)
 router.post("/post1", async (req, res) => {
-  // Extraction des données envoyées par le frontend
   const { id_patient, medecin, examens, constantes, interpretation } = req.body; 
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    // 1. Créer la demande (Le Parent)
+    // 1. Créer la demande
     const resD = await client.query(
       `INSERT INTO demande_examen (id_patient, medecin, interpretation, statut) 
        VALUES ($1, $2, $3, 'validé') RETURNING id_demande`,
@@ -94,13 +91,13 @@ router.post("/post1", async (req, res) => {
     
     const id_demande = resD.rows[0].id_demande;
 
-    // 2. Insérer chaque examen (Les Lignes)
-    // ATTENTION : "examens" doit être un tableau d'identifiants [1, 2, 3]
+    // 2. Insérer chaque examen avec son prix actuel (Photographie du prix)
     if (examens && examens.length > 0) {
       for (const id_ex of examens) {
+        // Cette requête insère l'id_demande et va chercher le prix dans la table examen
         await client.query(
-          `INSERT INTO demande_examen_ligne (id_demande, id_examen) 
-           VALUES ($1, $2)`,
+          `INSERT INTO demande_examen_ligne (id_demande, id_examen, prix_applique) 
+           SELECT $1, id_examen, prix FROM examen WHERE id_examen = $2`,
           [id_demande, id_ex]
         );
       }
@@ -113,8 +110,7 @@ router.post("/post1", async (req, res) => {
 
   } catch (err) {
     await client.query('ROLLBACK');
-    // TRÈS IMPORTANT : Regardez votre terminal Node.js pour lire ce message
-    console.error("ERREUR SERVEUR (POST /post):", err.message);
+    console.error("ERREUR:", err.message);
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
@@ -217,7 +213,8 @@ router.get("/lignes/:id_demande", async (req, res) => {
 router.get("/affiches", async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT d.*, p.nom, p.prenom 
+      SELECT d.*, p.nom, p.prenom, 
+        (SELECT SUM(prix_applique) FROM demande_examen_ligne WHERE id_demande = d.id_demande) as total
       FROM demande_examen d
       JOIN patient p ON d.id_patient = p.id_patient
       WHERE d.statut IN ('validé')

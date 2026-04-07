@@ -14,6 +14,8 @@ const io = new Server(server, {
 
 require("./socket")(io);
 
+app.set("socketio", io);
+
 // routes
 app.use("/api/patient", require("./routes/patient"));
 app.use("/api/parameteur", require("./routes/parameteur"));

@@ -7,7 +7,6 @@ import { createRoot } from 'react-dom/client'
 // } from "react-router-dom";
 import './index.css'
 import App from './App.jsx'
-import PatientsCRUD from './pages/PatientsCRUD.jsx'
 import Inscription from './inscription.jsx'
 import Connexion from './Connexion.jsx'
 import Gestion from './Gestion.jsx'

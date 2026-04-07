@@ -1,27 +1,56 @@
 const router = require("express").Router();
 const pool = require("../db");
 
-
-
-
-//accueil
-/// CREATE 
+ 
+// --- CRÉATION (POST) ---
 router.post("/post", async (req, res) => {
-  const { nom, prenom, sexe, telephone, abonne } = req.body;
+  const { nom, prenom, sexe, telephone, abonne, consultation } = req.body;
+  try {
+    const r = await pool.query(`
+      INSERT INTO patient(nom, prenom, sexe, telephone, abonne, consultation)
+      VALUES($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [
+      nom,
+      prenom || 'Non renseigné',
+      sexe || 'Non précisé',
+      telephone || '00000000',
+      abonne || 'non',
+      consultation || 'Généraliste' // Valeur par défaut si vide
+    ]);
+    res.json(r.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-  const r = await pool.query(`
-    INSERT INTO patient(nom, prenom, sexe, telephone, abonne)
-    VALUES($1,$2,$3,$4,$5)
-    RETURNING *
-  `, [
-    nom,
-    prenom || 'Non renseigné',
-    sexe || 'Non renseigné',
-    telephone || 'Non renseigné',
-    abonne || "non"
-  ]);
-
-  res.json(r.rows[0]);
+// --- MISE À JOUR (PUT) ---
+router.put("/:id", async (req, res) => {
+  const { nom, prenom, sexe, telephone, abonne, consultation } = req.body;
+  try {
+    const r = await pool.query(`
+      UPDATE patient
+      SET nom=$1,
+          prenom=$2,
+          sexe=$3,
+          telephone=$4,
+          abonne=$5,
+          consultation=$6  -- Virgule supprimée ici
+      WHERE id_patient=$7
+      RETURNING *
+    `, [
+      nom,
+      prenom,
+      sexe,
+      telephone,
+      abonne || 'non',
+      consultation || 'Non renseigné',
+      req.params.id
+    ]);
+    res.json(r.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /// READ ALL
@@ -37,29 +66,7 @@ router.get("/:id", async (req, res) => {
 });
 
 /// UPDATE
-router.put("/:id", async (req, res) => {
-  const { nom, prenom, sexe, telephone, abonne } = req.body;
 
-  const r = await pool.query(`
-    UPDATE patient
-    SET nom=$1,
-        prenom=$2,
-        sexe=$3,
-        telephone=$4,
-        abonne=$5
-    WHERE id_patient=$6
-    RETURNING *
-  `, [
-    nom,
-    prenom,
-    sexe,
-    telephone,
-    abonne || 'non',
-    req.params.id
-  ]);
-
-  res.json(r.rows[0]);
-});
 
 /// DELETE
 // --- 1. SUPPRESSION ADMINISTRATIVE (Archivage) ---

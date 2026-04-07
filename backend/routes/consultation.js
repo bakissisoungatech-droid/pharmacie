@@ -56,6 +56,16 @@ router.get("/", async (req, res) => {
     }
 });
 
+router.get("/affiche", async (req, res) => {
+    try {
+        // On récupère tout pour pouvoir gérer l'affichage/masquage dans le tableau
+        const allConsul = await pool.query("SELECT * FROM consultation WHERE est_actif = true");
+        res.json(allConsul.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- 3. SUPPRIMER UNE CONSULTATION ---
 router.delete("/:id", async (req, res) => {
     try {

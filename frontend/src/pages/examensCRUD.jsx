@@ -73,8 +73,10 @@ function ExamenCRUD() {
       valeurs_defaut: isBilanMode ? "" : valeursDefaut,
       sous_categories: sousCategories,
       examens_inclus: isBilanMode ? examensInclus : [],
-      prix: prix,       // Nouveau champ
-      resultat: resultat // Nouveau champ
+      prix: prix, 
+      // On envoie la chaîne brute. 
+      // Exemple: "Négatif, Négatif" pour un examen à 2 paramètres.
+      resultat: isBilanMode ? "" : resultat 
     };
 
     try {
@@ -85,7 +87,7 @@ function ExamenCRUD() {
       }
       resetForm();
       loadExamens();
-      alert("Catalogue mis à jour !");
+      alert("Catalogue mis à jour avec succès !");
     } catch (error) {
       console.error("Erreur:", error.response?.data || error.message);
     }
@@ -268,30 +270,33 @@ function ExamenCRUD() {
       )}
 
       <div className="row mb-3">
-        {!isBilanMode && (
-          <div className="col-md-6">
-            <label className="form-label fw-bold">Unité / Résultat par défaut</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              value={resultat} 
-              onChange={(e) => setResultat(e.target.value)} 
-              placeholder="Ex: Négatif ou mg/L"
-            />
-          </div>
-        )}
-
+      {!isBilanMode && (
         <div className="col-md-6">
-          <label className="form-label fw-bold">Prix (FCFA)</label>
+          <label className="form-label fw-bold text-danger">Unités / Résultats (par défaut)</label>
           <input 
-            type="number" 
-            className="form-control" 
-            value={prix} 
-            onChange={(e) => setPrix(e.target.value)} 
-            placeholder="Ex: 5000"
+            type="text" 
+            className="form-control border-danger" 
+            value={resultat} 
+            onChange={(e) => setResultat(e.target.value)} 
+            placeholder="Ex: mg/L, Négatif, UI/mL"
           />
+          <div className="form-text">
+            Séparez par des virgules si l'examen a plusieurs paramètres (ex: Négatif, Positif).
+          </div>
         </div>
+      )}
+
+      <div className="col-md-6">
+        <label className="form-label fw-bold">Prix (FCFA)</label>
+        <input 
+          type="number" 
+          className="form-control" 
+          value={prix} 
+          onChange={(e) => setPrix(e.target.value)} 
+          placeholder="Ex: 5000"
+        />
       </div>
+    </div>
       </div>
 
       <div className="d-flex gap-2 mt-3">
