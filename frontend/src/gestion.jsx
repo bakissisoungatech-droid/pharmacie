@@ -10,7 +10,7 @@ import Inscription from "./inscription";
 import Parameteur from "./pages/parameteur";
 import DemandeExamen from "./pages/DemandeExamen";
 import DemandeExamen1 from "./pages/DemandeExamen1";
-import SaisieResultat from "./pages/Resultat";
+import ResultatExamen from "./pages/Resultat";
 import ListeResultatsGroupes from "./pages/consultationResultats";
 
 function Gestion() {
@@ -40,7 +40,7 @@ function Gestion() {
       case " demande_labo":
         return <LaboDemandes />;
       case "resultats":
-        return <SaisieResultat />;
+        return <ResultatExamen />;
       case "consultationResultats":
         return <ListeResultatsGroupes />;
       case "abonnement":

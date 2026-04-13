@@ -34,43 +34,35 @@ function ListeResultatsGroupes() {
 
       const catNom = ligne.categorie || "Autres";
       
-      // LOGIQUE CRITIQUE : Si c'est un bilan, il devient lui-même sa propre "sous-catégorie" 
-      // pour avoir son propre tableau dédié.
-      const sousCatNom = ligne.est_bilan === 'OUI' 
+      // On crée une clé unique par examen pour forcer un tableau individuel
+      // Si c'est un bilan, on ajoute le préfixe pour le style
+      const examenCle = ligne.est_bilan === 'OUI' 
         ? `BILAN : ${ligne.nom_examen}` 
-        : (ligne.sous_categories || "Général");
+        : ligne.nom_examen;
 
       if (!dossiers[cleDossier].categories[catNom]) {
         dossiers[cleDossier].categories[catNom] = {};
       }
       
-      if (!dossiers[cleDossier].categories[catNom][sousCatNom]) {
-        dossiers[cleDossier].categories[catNom][sousCatNom] = [];
+      if (!dossiers[cleDossier].categories[catNom][examenCle]) {
+        dossiers[cleDossier].categories[catNom][examenCle] = [];
       }
 
-      dossiers[cleDossier].categories[catNom][sousCatNom].push(ligne);
+      dossiers[cleDossier].categories[catNom][examenCle].push(ligne);
     });
 
-    // Remplace ton bloc filter dans useMemo par celui-ci :
+    // ... (ton code de filtrage par nom et date reste identique)
     return Object.values(dossiers).filter(d => {
-        // Sécurité Nom
         const nomComplet = `${d.infosPatient.nom || ""} ${d.infosPatient.prenom || ""}`.toLowerCase();
         const matchNom = nomComplet.includes(search.toLowerCase());
-        
-        // Sécurité Date
         let matchDate = true;
         if (filterDate !== "" && d.infosPatient.date) {
-            try {
-                const dateDossier = new Date(d.infosPatient.date).toISOString().split('T')[0];
-                matchDate = dateDossier === filterDate;
-            } catch (e) {
-                matchDate = false;
-            }
+            const dateDossier = new Date(d.infosPatient.date).toISOString().split('T')[0];
+            matchDate = dateDossier === filterDate;
         }
-
         return matchNom && matchDate;
     });
-    }, [resultats, search, filterDate]);
+  }, [resultats, search, filterDate]);
   
 
   const imprimerDossier = (groupe) => {
@@ -116,53 +108,71 @@ function ListeResultatsGroupes() {
           </div>
           
           <div className="card-body">
-            {Object.entries(groupe.categories).map(([nomCat, sousGroupes], catIdx) => {
-              const isBacterio = nomCat.toLowerCase().includes("bactério");
-              const isSero = nomCat.toLowerCase().includes("serologie");
+            {Object.entries(groupe.categories).map(([nomCat, examensDuGroupe], catIdx) => (
+              <div key={catIdx} className="mb-5 border rounded shadow-sm bg-white">
+                {/* TITRE DE LA CATÉGORIE (BIOCHIMIE, etc.) */}
+                <h5 className="bg-dark text-white p-2 text-uppercase small fw-bold rounded-top mb-0">
+                  {nomCat}
+                </h5>
+                
+                <div className="p-3">
+                  {Object.entries(examensDuGroupe).map(([nomExamen, lignes], exIdx) => {
+                    const isBio = lignes[0]?.est_biochimie === 'OUI';
+                    const isBilan = lignes[0]?.est_bilan === 'OUI';
 
-              return (
-                <div key={catIdx} className="mb-4 border rounded p-2 bg-white">
-                  {/* TITRE CATÉGORIE PRINCIPALE */}
-                  <h5 className="bg-dark text-white p-2 text-uppercase small fw-bold rounded-top mb-0">
-                    {nomCat}
-                  </h5>
-                  
-                  {/* BOUCLE SUR LES SOUS-CATÉGORIES */}
-                  
-                  {Object.entries(sousGroupes).map(([nomSousCat, examens], sCatIdx) => (
-                    <div key={sCatIdx} className="mt-3 px-2 border-start border-3 border-info ms-2 mb-4">
-                      <h6 className="text-primary fw-bold text-uppercase small bg-light p-2 rounded">
-                        {nomSousCat.includes("BILAN") ? `📑 ${nomSousCat}` : `📂 ${nomSousCat}`}
-                      </h6>
+                    return (
+                      <div key={exIdx} className="mb-4">
+                        {/* EN-TÊTE DE L'EXAMEN SEUL */}
+                        <div className={`p-2 border border-bottom-0 rounded-top ${isBilan ? 'bg-primary text-white' : 'bg-light fw-bold'}`}>
+                          <small>{isBilan ? "📑 BILAN : " : "🔬 EXAMEN : "}{nomExamen}</small>
+                        </div>
 
-                      <div className="table-responsive">
-                        <table className="table table-sm table-bordered mb-0">
-                          <thead className="table-secondary small text-center">
-                            <tr>
-                              <th style={{width: '30%'}}>Examen</th>
-                              <th>Paramètre</th>
-                              <th>Valeur</th>
-                              <th>Unités</th>
-                              <th>Normes</th>
-                            </tr>
-                          </thead>
-                          <tbody className="small">
-                            {examens.map((ex, l) => (
-                              <tr key={l}>
-                                {/* Utilise les nouveaux noms de colonnes définis dans le SQL */}
-                                <td>{ex.nom_parametre}</td>
-                                <td className="fw-bold">{ex.valeur_resultat}</td>
-                                <td className="text-muted small">{ex.norme_reference}</td>
+                        <div className="table-responsive">
+                          <table className="table table-sm table-bordered mb-0">
+                            <thead className="table-secondary small text-center">
+                              <tr>
+                                <th style={{ width: '25%' }}>Paramètre</th>
+                                <th>Résultat</th>
+                                {/* COLONNES DYNAMIQUES SELON TYPE */}
+                                {isBio ? (
+                                  <th style={{ width: '35%' }}>Valeurs de Référence</th>
+                                ) : (
+                                  <>
+                                    <th>Titre</th>
+                                    <th>Valeur</th>
+                                    <th>Interprétation</th>
+                                  </>
+                                )}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="small">
+                              {lignes.map((ligne, lIdx) => (
+                                <tr key={lIdx} className="text-center align-middle">
+                                  <td className="text-start ps-2">{ligne.nom_parametre}</td>
+                                  <td className={`fw-bold ${ligne.valeur_resultat === 'POSITIF' ? 'text-danger' : ''}`}>
+                                    {ligne.valeur_resultat}
+                                  </td>
+
+                                  {isBio ? (
+                                    <td>{ligne.norme_reference}</td>
+                                  ) : (
+                                    <>
+                                      <td>{ligne.titre_sero}</td>
+                                      <td>{ligne.norme_reference}</td>
+                                      <td className="fst-italic">{ligne.interpretation_sero}</td>
+                                    </>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       ))}
