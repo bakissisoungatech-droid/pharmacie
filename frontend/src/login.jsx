@@ -12,7 +12,6 @@ export default function Login() {
     e.preventDefault();
     try {
       const user = await login({ nom, mdp });
-
       // --- AJOUT : Stockage de la session ---
       // On transforme l'objet user en chaîne JSON pour le stocker
       sessionStorage.setItem("user", JSON.stringify(user));

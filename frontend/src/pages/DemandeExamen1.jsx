@@ -16,22 +16,22 @@ function DemandeExamen() {
   // --- États Formulaire ---
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [medecin, setMedecin] = useState("");
-  const [examensChoisis, setExamensChoisis] = useState([]);
+  const [examensChoisis, setExamensChoisis] = useState([]); // Tableau d'ID normalisés en String
   const [searchExamenModal, setSearchExamenModal] = useState("");
   const [constantes, setConstantes] = useState({
     poids: "", tension: "", temperature: "", age: "", saturation: ""
   });
 
-  // --- État Détails (Nouveau) ---
+  // --- État Détails ---
   const [detailDemande, setDetailDemande] = useState(null);
   const [lignesDetail, setLignesDetail] = useState([]);
 
-  // --- États Liste (Recherche, Filtre, Tri) ---
+  // --- États Liste ---
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPeriod, setFilterPeriod] = useState("tous");
   const [sortConfig, setSortConfig] = useState({ key: "date_demande", direction: "desc" });
-
-  const [specificDate, setSpecificDate] = useState(""); // Pour le calendrier
+  const [specificDate, setSpecificDate] = useState("");
+  const [prescriptionId, setPrescriptionId] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -43,22 +43,22 @@ function DemandeExamen() {
       setPatients(resP.data);
       setExamensDispo(resE.data);
       setDemandes(resD.data);
-    } catch (err) { console.error("Erreur chargement", err); alert("probleme de connexion internet");}
+    } catch (err) { 
+      console.error("Erreur chargement", err); 
+      alert("Problème de connexion internet ou serveur indisponible");
+    }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Fonction ager charger les détails d'une demande
   const voirDetails = async (demande) => {
     try {
       setDetailDemande(demande);
       const res = await axios.get(`http://localhost:3000/api/demande_examen1/lignes/${demande.id_demande}`);
       setLignesDetail(res.data);
-      // Déclenchement manuel du modal si nécessaire (ou via data-bs-toggle)
     } catch (err) { console.error("Erreur détails", err); }
   };
 
-  // Calcule le total des examens pour l'affichage dans le modal
   const totalDemande = useMemo(() => {
     return lignesDetail.reduce((sum, ligne) => sum + Number(ligne.prix_applique || 0), 0);
   }, [lignesDetail]);
@@ -69,16 +69,13 @@ function DemandeExamen() {
       const maintenant = new Date();
       let matchDate = true;
 
-      // --- Filtre par Période ---
       if (filterPeriod === "jour") {
         matchDate = dateD.toDateString() === maintenant.toDateString();
       } else if (filterPeriod === "mois") {
         matchDate = (dateD.getMonth() === maintenant.getMonth() && dateD.getFullYear() === maintenant.getFullYear());
       } else if (filterPeriod === "annee") {
         matchDate = dateD.getFullYear() === maintenant.getFullYear();
-      } 
-      // --- NOUVEAU : Filtre par Date Précise ---
-      else if (filterPeriod === "precise" && specificDate) {
+      } else if (filterPeriod === "precise" && specificDate) {
         const selectedDate = new Date(specificDate).toDateString();
         matchDate = dateD.toDateString() === selectedDate;
       }
@@ -87,7 +84,6 @@ function DemandeExamen() {
       return matchDate && searchStr.includes(searchTerm.toLowerCase());
     });
 
-    // Logique de tri (reste identique)
     result.sort((a, b) => {
       let aVal = a[sortConfig.key];
       let bVal = b[sortConfig.key];
@@ -98,12 +94,12 @@ function DemandeExamen() {
     });
     return result;
   }, [demandes, searchTerm, filterPeriod, specificDate, sortConfig]);
+
   const handlePatientChange = (id) => {
-  // On compare en String pour éviter les soucis de type
-  const p = patients.find(pat => String(pat.id_patient) === String(id));
+    const p = patients.find(pat => String(pat.id_patient) === String(id));
     if (p) {
       setSelectedPatient(p);
-      setSearchPatient(`${p.nom} ${p.prenom}`); // On met à jour le texte affiché
+      setSearchPatient(`${p.nom} ${p.prenom}`);
       setConstantes({
         poids: p.poids || "", 
         tension: p.tension || "",
@@ -115,31 +111,29 @@ function DemandeExamen() {
   };
 
   const toggleExamen = (id) => {
-    setExamensChoisis(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    const idStr = String(id).trim();
+    setExamensChoisis(prev => 
+      prev.includes(idStr) ? prev.filter(i => i !== idStr) : [...prev, idStr]
+    );
   };
 
-  // Supprimer
   const supprimerDemande = async (id) => {
     if (window.confirm("Voulez-vous vraiment supprimer cette demande ?")) {
       try {
         await axios.delete(`http://localhost:3000/api/demande_examen1/${id}`);
-        fetchData(); // Rafraîchir la liste
+        fetchData();
       } catch (err) { alert("Erreur lors de la suppression"); }
     }
   };
 
-  // Préparer la modification (remplit le formulaire avec les données existantes)
   const preparerModification = async (demande) => {
     setIsEditing(true);
     setEditingId(demande.id_demande);
     
-    // 1. Trouver le patient
-    const p = patients.find(pat => pat.id_patient === demande.id_patient);
+    const p = patients.find(pat => String(pat.id_patient) === String(demande.id_patient));
     if (p) {
       setSelectedPatient(p);
-      setSearchPatient(`${p.nom} ${p.prenom}`); // CRUCIAL : Remplir le champ de recherche
-      
-      // Remplir les constantes si elles existent dans l'objet demande ou patient
+      setSearchPatient(`${p.nom} ${p.prenom}`);
       setConstantes({
         poids: p.poids || "", 
         tension: p.tension || "",
@@ -151,10 +145,10 @@ function DemandeExamen() {
 
     setMedecin(demande.medecin || "");
 
-    // 2. Récupérer les examens cochés
     try {
       const res = await axios.get(`http://localhost:3000/api/demande_examen1/lignes/${demande.id_demande}`);
-      setExamensChoisis(res.data.map(l => l.id_examen));
+      const idsFormatte = res.data.map(l => String(l.id_examen || l.id_examen_univ || "").trim()).filter(Boolean);
+      setExamensChoisis(idsFormatte);
       
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) { 
@@ -162,7 +156,6 @@ function DemandeExamen() {
     }
   };
 
-  // Enregistrer (Création OU Modification)
   const enregistrerDemande = async () => {
     if (!selectedPatient || examensChoisis.length === 0) {
       return alert("Veuillez sélectionner un patient et au moins un examen.");
@@ -173,7 +166,7 @@ function DemandeExamen() {
         id_patient: selectedPatient.id_patient,
         medecin,
         examens: examensChoisis,
-        interpretation: "" // On envoie une chaîne vide par défaut
+        interpretation: "" 
       };
 
       if (isEditing) {
@@ -184,86 +177,199 @@ function DemandeExamen() {
         alert("Nouvelle demande enregistrée !");
       }
       
-      // --- RESET COMPLET ---
       setIsEditing(false);
       setEditingId(null);
       setExamensChoisis([]);
       setMedecin("");
-      setSearchPatient(""); // Vider le champ de recherche
+      setSearchPatient("");
       setSelectedPatient(null);
-      fetchData(); // Rafraîchir la liste
+      fetchData();
     } catch (err) { 
       console.error(err);
       alert("Erreur lors de l'enregistrement : " + (err.response?.data?.error || err.message)); 
+    }
+  };
+
+  // --- ALGORITHME DE CORRESPONDANCE PHONÉTIQUE ET TEXTUELLE AVANCÉE ---
+  
+  const nettoyerTexte = (str) => {
+    if (!str) return "";
+    return String(str)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Supprime les accents
+      .replace(/[^a-z0-9 ]/g, "") // Enlève la ponctuation facultative
+      .trim();
+  };
+
+  const calculerSimilitudeLevenshtein = (str1, str2) => {
+    const s1 = nettoyerTexte(str1);
+    const s2 = nettoyerTexte(str2);
+
+    if (s1 === s2) return 1.0; 
+    
+    // RÈGLE DE CONTINUITÉ GRÂCE À L'ESPACE (Restriction n°2)
+    // Si l'un des mots est le prolongement exact de l'autre séparé ou suivi par un espace
+    if (s1.includes(s2 + " ") || s1.includes(" " + s2) || s2.includes(s1 + " ") || s2.includes(" " + s1)) {
+      return 0.95; // Score très élevé accordé pour la continuité spatiale
+    }
+
+    // Inclusion simple brute
+    if (s1.includes(s2) || s2.includes(s1)) return 0.90; 
+
+    // Calcul Levenshtein classique
+    const track = Array(s2.length + 1).fill(null).map(() => Array(s1.length + 1).fill(null));
+    for (let i = 0; i <= s1.length; i += 1) track[0][i] = i;
+    for (let j = 0; j <= s2.length; j += 1) track[j][0] = j;
+
+    for (let j = 1; j <= s2.length; j += 1) {
+      for (let i = 1; i <= s1.length; i += 1) {
+        const indicator = s1[i - 1] === s2[j - 1] ? 0 : 1;
+        track[j][i] = Math.min(
+          track[j][i - 1] + 1, 
+          track[j - 1][i] + 1, 
+          track[j - 1][i - 1] + indicator 
+        );
+      }
+    }
+    
+    const distance = track[s2.length][s1.length];
+    const longueurMax = Math.max(s1.length, s2.length);
+    return (longueurMax - distance) / longueurMax; 
+  };
+
+  // --- RECHERCHE INTELLIGENTE AVEC VOS RESTRICTIONS ---
+  const chargerPrescription = async (id) => {
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      alert("Veuillez saisir ou sélectionner un ID de prescription valide.");
+      return;
+    }
+    
+    try {
+      const response = await axios.get(`http://localhost:3000/api/prescription/lignes/${id.trim()}`);
+      const lignesPrescription = response.data;
+
+      if (!lignesPrescription || lignesPrescription.length === 0) {
+        alert("Aucun examen trouvé pour cette prescription ou l'ID n'existe pas.");
+        return;
+      }
+
+      const examensTrouvesIds = [];
+      let examensNomsSelectionnes = []; // Pour énumérer dans le alert
+      let examensNonReconnus = [];
+
+      lignesPrescription.forEach(ligne => {
+        const nomPrescrip = ligne.nom_examen;
+        const nomPrescripNettoye = nettoyerTexte(nomPrescrip);
+        
+        let meilleurMatch = null;
+        let scoreMax = 0;
+
+        examensDispo.forEach(ex => {
+          if (ex.est_actif === false) return;
+          
+          const nomCatalogNettoye = nettoyerTexte(ex.nom_examen);
+          const score = calculerSimilitudeLevenshtein(ex.nom_examen, nomPrescrip);
+          
+          if (score > scoreMax) {
+            scoreMax = score;
+            meilleurMatch = ex;
+          }
+        });
+
+        // RÈGLE DE STRICT CORRESPONDANCE DE LONGUEUR POUR LES MOTS COURTS (Restriction n°1)
+        // Empêche de valider un faux positif si les longueurs divergent totalement sans continuité d'espace
+        if (meilleurMatch) {
+          const nomMatchNettoye = nettoyerTexte(meilleurMatch.nom_examen);
+          
+          // Si le terme fait moins de 5 caractères (ex: NFS, CRP) et que les longueurs ne matchent pas exactement
+          // ET qu'il n'y a pas de continuité directe par espace, on rejette.
+          if (nomPrescripNettoye.length <= 5 && nomPrescripNettoye.length !== nomMatchNettoye.length) {
+            if (!nomMatchNettoye.includes(nomPrescripNettoye + " ") && !nomMatchNettoye.includes(" " + nomPrescripNettoye)) {
+              scoreMax = 0; // On force l'annulation de la sélection
+            }
+          }
+        }
+
+        // SEUIL DE TOLÉRANCE
+        if (meilleurMatch && scoreMax >= 0.65) {
+          examensTrouvesIds.push(String(meilleurMatch.id_examen).trim());
+          examensNomsSelectionnes.push(meilleurMatch.nom_examen); // Stockage pour l'alerte
+        } else {
+          examensNonReconnus.push(nomPrescrip || "Examen sans nom");
+        }
+      });
+      
+      // Assigne les IDs à l'état
+      setExamensChoisis(examensTrouvesIds);
+
+      // Charge le reste des informations si disponibles
+      if (lignesPrescription[0].id_patient) {
+        handlePatientChange(lignesPrescription[0].id_patient);
+      }
+      if (lignesPrescription[0].medecin) {
+        setMedecin(lignesPrescription[0].medecin); 
+      }
+
+      // --- COMPOSITION DES ALERTES AVEC ÉNUMÉRATION ---
+      const listeSelectionnes = examensNomsSelectionnes.length > 0 
+        ? `\n- ${examensNomsSelectionnes.join('\n- ')}` 
+        : "Aucun";
+
+      if (examensNonReconnus.length > 0) {
+        alert(`⚠️ Prescription chargée partiellement.\n\n✅ EXAMENS SÉLECTIONNÉS :${listeSelectionnes}\n\n❌ NON RECONNUS (Écart ou longueur incorrecte) :\n- ${examensNonReconnus.join('\n- ')}`);
+      } else {
+        alert(`✅ ${examensTrouvesIds.length} examen(s) identifié(s) et chargé(s) avec succès !\n\nEXAMENS RETENUS :${listeSelectionnes}`);
+      }
+
+      document.getElementById("closePrescriptionModal")?.click();
+      setPrescriptionId("");
+
+    } catch (err) {
+      console.error("Erreur lors du chargement de la prescription :", err);
+      alert("Impossible de joindre le serveur ou l'ID de prescription est introuvable.");
     }
   };
   
   return (
     <div className="container mt-4 mb-5">
       <style>{`
-            @media print {
-                /* Masquer les éléments inutiles */
-                .no-print, form,.alert { 
-                display: none !important; 
-                }
-    
-                /* Ajuster les marges de la page */
-                @page {
-                margin: 1cm;
-                }
-    
-                .container { 
-                width: 100% !important; 
-                max-width: 100% !important; 
-                margin: 0 !important; 
-                padding: 0 !important; 
-                }
-    
-                /* Style du tableau pour l'impression */
-                table { 
-                width: 100% !important; 
-                border-collapse: collapse !important;
-                font-size: 12px; /* Texte plus petit pour faire tenir plus de colonnes */
-                }
-                
-                th, td { 
-                border: 1px solid #000 !important; 
-                padding: 8px !important;
-                }
-    
-                .badge {
-                border: 1px solid #ccc !important;
-                color: #000 !important;
-                background: transparent !important;
-                }
-            }
+        @media print {
+          .no-print, form, .alert { display: none !important; }
+          @page { margin: 1cm; }
+          .container { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          table { width: 100% !important; border-collapse: collapse !important; font-size: 12px; }
+          th, td { border: 1px solid #000 !important; padding: 8px !important; }
+          .badge { border: 1px solid #ccc !important; color: #000 !important; background: transparent !important; }
+        }
       `}</style>
 
-      {/* EN-TÊTE D'IMPRESSION (Visible uniquement à l'imprimante) */}
+      {/* EN-TÊTE D'IMPRESSION */}
       <div className="d-none d-print-block mb-4">
-      <div className="row align-items-center border-bottom pb-3">
+        <div className="row align-items-center border-bottom pb-3">
           <div className="col-4">
-          {/* <img src={Logo} style={{width: '80px'}} /> */}
-          <h4 className="fw-bold mb-0">destiny express</h4>
-          <p className="small mb-0">ggfs hjjkkdf</p>
-          <p className="small mb-0">Tél : +242 XX XXX XX XX</p>
+            <h4 className="fw-bold mb-0">destiny express</h4>
+            <p className="small mb-0">ggfs hjjkkdf</p>
+            <p className="small mb-0">Tél : +242 XX XXX XX XX</p>
           </div>
           <div className="col-4 text-center">
-          <h2 className="text-uppercase fw-bold">Rapport</h2>
+            <h2 className="text-uppercase fw-bold">Rapport</h2>
           </div>
           <div className="col-4 text-end">
-          <p className="mb-0">Date d'édition : {new Date().toLocaleDateString()}</p>
-          <p className="mb-0">Heure : {new Date().toLocaleTimeString()}</p>
+            <p className="mb-0">Date d'édition : {new Date().toLocaleDateString()}</p>
+            <p className="mb-0">Heure : {new Date().toLocaleTimeString()}</p>
           </div>
-      </div>
-      <h3 className="text-center mt-3 text-decoration-underline no-print">Liste des Patients Enregistrés</h3>
+        </div>
       </div>
 
-      {/* SECTION FORMULAIRE (Modifiée ager afficher l'état Edition) */}
+      {/* SECTION FORMULAIRE */}
       <div className={`card no-print shadow-sm p-4 border-0 mb-4 ${isEditing ? 'border-start border-warning border-5' : 'bg-light'}`}>
         <h4 className={`mb-4 ${isEditing ? 'text-warning' : 'text-primary'}`}>
           {isEditing ? `✏️ Modification Demande #${editingId}` : '📑 Nouvelle Demande d\'Analyses'}
         </h4>
+        <button type="button" className="btn btn-outline-info mb-3" data-bs-toggle="modal" data-bs-target="#modalPrescription">
+          🔌 Charger depuis une Prescription
+        </button>
         <div className="row no-print">
           <div className="col-md-6 mb-3 position-relative">
             <label className="form-label fw-bold">Patient</label>
@@ -273,13 +379,11 @@ function DemandeExamen() {
                 type="text"
                 className="form-control shadow-sm border-start-0"
                 placeholder="Taper le nom du patient..."
-                // On utilise searchPatient en priorité pour la saisie
                 value={searchPatient} 
                 onChange={(e) => {
                   const val = e.target.value;
                   setSearchPatient(val);
                   setShowPatientList(true);
-                  // Si l'utilisateur efface, on déselectionne le patient
                   if (selectedPatient && val !== `${selectedPatient.nom} ${selectedPatient.prenom}`) {
                     setSelectedPatient(null);
                   }
@@ -291,11 +395,9 @@ function DemandeExamen() {
               )}
             </div>
 
-            {/* Liste déroulante personnalisée */}
             {showPatientList && !selectedPatient && searchPatient.length > 0 && (
               <ul className="list-group position-absolute w-100 shadow-lg" style={{ zIndex: 1000, maxHeight: '200px', overflowY: 'auto' }}>
                 {patients
-                  // CORRECTION : On filtre pour ne garder que les patients actifs ou NULL
                   .filter(p => p.est_actif !== false) 
                   .filter(p => `${p.nom} ${p.prenom}`.toLowerCase().includes(searchPatient.toLowerCase()))
                   .map(p => (
@@ -311,7 +413,6 @@ function DemandeExamen() {
                       <strong>{p.nom}</strong> {p.prenom} <small className="text-muted">({p.telephone})</small>
                     </li>
                   ))}
-                {/* Ajustement du message "Aucun trouvé" pour prendre en compte le filtre est_actif */}
                 {patients.filter(p => p.est_actif !== false && `${p.nom} ${p.prenom}`.toLowerCase().includes(searchPatient.toLowerCase())).length === 0 && (
                   <li className="list-group-item disabled">Aucun patient actif trouvé</li>
                 )}
@@ -329,7 +430,7 @@ function DemandeExamen() {
                <div className="col-md-3"><strong>Poids:</strong> <input className="form-control form-control-sm" value={constantes.poids} onChange={e=>setConstantes({...constantes, poids: e.target.value})}/></div>
                <div className="col-md-3"><strong>Tension:</strong> <input className="form-control form-control-sm" value={constantes.tension} onChange={e=>setConstantes({...constantes, tension: e.target.value})}/></div>
                <div className="col-md-3"><strong>Temp:</strong> <input className="form-control form-control-sm" value={constantes.temperature} onChange={e=>setConstantes({...constantes, temperature: e.target.value})}/></div>
-               <div className="col-md-3"><strong>age:</strong> <input className="form-control form-control-sm" value={constantes.age} onChange={e=>setConstantes({...constantes, age: e.target.value})}/></div>
+               <div className="col-md-3"><strong>Age:</strong> <input className="form-control form-control-sm" value={constantes.age} onChange={e=>setConstantes({...constantes, age: e.target.value})}/></div>
             </div>
           </div>
         )}
@@ -343,31 +444,23 @@ function DemandeExamen() {
           </button>
 
           {isEditing && (
-            <button className="btn btn-secondary" onClick={() => { setIsEditing(false); setMedecin(""); setExamensChoisis([]); setSelectedPatient(null); }}>
+            <button className="btn btn-secondary" onClick={() => { setIsEditing(false); setMedecin(""); setExamensChoisis([]); setSelectedPatient(null); setSearchPatient(""); }}>
               Annuler
             </button>
           )}
         </div>
       </div>
 
-      {/* SECTION HISTORIQUE AVEC FILTRES ET TRI */}
-      <div className="card shadow-sm p-4 ">
+      {/* SECTION HISTORIQUE */}
+      <div className="card shadow-sm p-4">
         <h4 className="mb-4">📋 Historique des Demandes</h4>
         
         <div className="row g-2 mb-3 align-items-end no-print">
-          {/* Recherche textuelle */}
           <div className="col-md-3">
             <label className="form-label small fw-bold">Recherche rapide</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              placeholder="Patient, médecin..." 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-            />
+            <input type="text" className="form-control" placeholder="Patient, médecin..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
 
-          {/* Sélecteur de type de période */}
           <div className="col-md-3 no-print">
             <label className="form-label small fw-bold">Période</label>
             <select className="form-select" value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)}>
@@ -378,16 +471,10 @@ function DemandeExamen() {
             </select>
           </div>
 
-          {/* Champ Date précise (Affiche seulement si "Date précise" est sélectionné) */}
           {filterPeriod === "precise" && (
-            <div className="col-md-3 animate__animated animate__fadeIn">
+            <div className="col-md-3">
               <label className="form-label small fw-bold">Choisir le jour</label>
-              <input 
-                type="date" 
-                className="form-control border-primary" 
-                value={specificDate} 
-                onChange={e => setSpecificDate(e.target.value)} 
-              />
+              <input type="date" className="form-control border-primary" value={specificDate} onChange={e => setSpecificDate(e.target.value)} />
             </div>
           )}
 
@@ -400,7 +487,6 @@ function DemandeExamen() {
           <table className="table table-hover align-middle border">
             <thead className="table-dark">
               <tr>
-                {/* En-têtes cliquables pour le tri */}
                 <th onClick={() => setSortConfig({ key: 'date_demande', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })} style={{ cursor: 'pointer' }}>
                   Date {sortConfig.key === 'date_demande' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕️'}
                 </th>
@@ -417,46 +503,29 @@ function DemandeExamen() {
                 filteredDemandes.map(d => (
                   <tr key={d.id_demande}>
                     <td className="small">{new Date(d.date_demande).toLocaleString('fr-FR')}</td>
-                    <td>
-                      <span className="fw-bold text-uppercase">{d.nom}</span> {d.prenom}
-                    </td>
+                    <td><span className="fw-bold text-uppercase">{d.nom}</span> {d.prenom}</td>
                     <td>{d.medecin || <em className="text-muted">Non spécifié</em>}</td>
                     <td className="no-print">
-                      <span className={`badge ${d.statut === 'nouveau' ? 'bg-info' : 'bg-success'}`}>
-                        {d.statut}
-                      </span>
+                      <span className={`badge ${d.statut === 'nouveau' ? 'bg-info' : 'bg-success'}`}>{d.statut}</span>
                     </td>
                     <td className="text-center no-print">
                       <div className="btn-group shadow-sm">
-                        <button className="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalDetails" onClick={() => voirDetails(d)} title="Voir détails">
-                          👁️
-                        </button>
-                        <button className="btn btn-sm btn-warning" onClick={() => preparerModification(d)} title="Modifier">
-                          ✏️
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => supprimerDemande(d.id_demande)} title="Supprimer">
-                          🗑️
-                        </button>
+                        <button className="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalDetails" onClick={() => voirDetails(d)}>👁️</button>
+                        <button className="btn btn-sm btn-warning" onClick={() => preparerModification(d)}>✏️</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => supprimerDemande(d.id_demande)}>🗑️</button>
                       </div>
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan="5" className="text-center py-4 text-muted">
-                    Aucune demande trouvée pour ces critères.
-                  </td>
-                </tr>
+                <tr><td colSpan="5" className="text-center py-4 text-muted">Aucune demande trouvée.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="small text-muted mt-2">
-          Affichage de <strong>{filteredDemandes.length}</strong> résultat(s) sur {demandes.length}
-        </div>
       </div>
 
-      {/* MODAL 1 : SÉLECTION EXAMENS (Identique) */}
+      {/* MODAL 1 : SÉLECTION EXAMENS */}
       <div className="modal fade" id="modalExamen" tabIndex="-1">
         <div className="modal-dialog modal-dialog-scrollable">
           <div className="modal-content">
@@ -468,20 +537,26 @@ function DemandeExamen() {
               <input type="text" className="form-control" placeholder="🔍 Rechercher..." value={searchExamenModal} onChange={e=>setSearchExamenModal(e.target.value)} />
             </div>
             <div className="modal-body">
-              {examensDispo.filter(ex => ex.nom_examen.toLowerCase().includes(searchExamenModal.toLowerCase()) &&ex.est_actif !== false // CORRECTION : Filtre les examens archivés
-                ).map(ex => (
-                <div key={ex.id_examen} className="d-flex justify-content-between border-bottom py-2 px-1">
-                  <label htmlFor={`ex-${ex.id_examen}`}>{ex.nom_examen}</label>
-                  <input className="form-check-input" type="checkbox" id={`ex-${ex.id_examen}`} checked={examensChoisis.includes(ex.id_examen)} onChange={() => toggleExamen(ex.id_examen)} />
-                </div>
-              ))}
+              {examensDispo.filter(ex => ex.nom_examen.toLowerCase().includes(searchExamenModal.toLowerCase()) && ex.est_actif !== false)
+                .map(ex => (
+                  <div key={ex.id_examen} className="d-flex justify-content-between border-bottom py-2 px-1">
+                    <label htmlFor={`ex-${ex.id_examen}`}>{ex.nom_examen}</label>
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id={`ex-${ex.id_examen}`} 
+                      checked={examensChoisis.includes(String(ex.id_examen).trim())} 
+                      onChange={() => toggleExamen(ex.id_examen)} 
+                    />
+                  </div>
+                ))}
             </div>
             <div className="modal-footer"><button className="btn btn-primary w-100" data-bs-dismiss="modal">Terminer</button></div>
           </div>
         </div>
       </div>
 
-      {/* MODAL 2 : DÉTAILS DE LA DEMANDE (NOUVEAU) */}
+      {/* MODAL 2 : DÉTAILS */}
       <div className="modal fade" id="modalDetails" tabIndex="-1">
         <div className="modal-dialog modal-lg shadow-lg">
           <div className="modal-content border-0">
@@ -504,19 +579,15 @@ function DemandeExamen() {
                       <span className="badge bg-warning text-dark">Statut : {detailDemande.statut}</span>
                     </div>
                   </div>
-
                   <h6 className="fw-bold mb-3 border-bottom pb-2">🧪 Examens demandés</h6>
                   <div className="list-group list-group-flush mb-4">
                     {lignesDetail.map((l, index) => (
                       <div key={index} className="list-group-item d-flex justify-content-between align-items-center bg-transparent border-0 px-0">
-                        <span><i className="bi bi-check2-circle text-success me-2"></i> {l.nom_examen}</span>
-                        {/* Affichage du prix de la ligne */}
+                        <span>{l.nom_examen}</span>
                         <span className="fw-bold">{Number(l.prix_applique).toLocaleString()} FCFA</span>
                       </div>
                     ))}
                   </div>
-
-                  {/* Affichage du TOTAL */}
                   <div className="d-flex justify-content-between p-3 bg-dark text-white rounded">
                     <h5 className="mb-0">MONTANT TOTAL :</h5>
                     <h5 className="mb-0">{totalDemande.toLocaleString()} FCFA</h5>
@@ -527,6 +598,28 @@ function DemandeExamen() {
             <div className="modal-footer bg-light">
               <button className="btn btn-dark" onClick={() => window.print()}>🖨️ Imprimer la fiche</button>
               <button className="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* MODAL 3 : PRESCRIPTION */}
+      <div className="modal fade" id="modalPrescription" tabIndex="-1">
+        <div className="modal-dialog">
+          <div className="modal-content border-0 shadow">
+            <div className="modal-header bg-info text-white">
+              <h5 className="modal-title">🔌 Importer une Prescription</h5>
+              <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closePrescriptionModal"></button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <label className="form-label fw-bold">ID de la Prescription</label>
+                <input type="text" className="form-control shadow-sm" value={prescriptionId} onChange={(e) => setPrescriptionId(e.target.value)} placeholder="Saisir l'ID..." />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+              <button type="button" className="btn btn-info" onClick={() => chargerPrescription(prescriptionId)}>⚡ Charger la prescription</button>
             </div>
           </div>
         </div>

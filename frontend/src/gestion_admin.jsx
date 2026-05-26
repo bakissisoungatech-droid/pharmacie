@@ -15,7 +15,7 @@ import DemandeExamen1 from "./pages/DemandeExamen1";
 import ResultatExamen from "./pages/Resultat";
 import ListeResultatsGroupes from "./pages/consultationResultats";
 import Caisse from "./pages/caisse";
-import Inscription1 from "./inscription1";
+
 
 function Gestion1() {
   const [activePage, setActivePage] = useState("dashboard");
@@ -27,8 +27,6 @@ function Gestion1() {
         return <Dashboard />;
       case "utilisateurs":
         return <Inscription />;
-      case "utilisateurs1":
-        return <Inscription1 />;
       case "login":
         return <Login />;
       case "consultation":
@@ -43,9 +41,8 @@ function Gestion1() {
         return <ExamenPrescription />;
       case "demande_medecin":
         return <DemandeMedecin />;
-
       case "demande_examen1":
-        return <DemandeExamen1 />
+        return <DemandeExamen1 />;
       case " demande_labo":
         return <LaboDemandes />;
       case "resultats":

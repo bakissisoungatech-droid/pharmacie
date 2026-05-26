@@ -102,6 +102,7 @@ function Inscription() {
                                         <option value="Accueil">Accueil</option>
                                         <option value="Medecin">Medecin</option>
                                         <option value="Admin">Admin</option>
+                                        <option value="Proprio">Proprio</option>
                                     </select>
                                 </div>
                                 <button className="btn btn-primary w-100" type="submit">

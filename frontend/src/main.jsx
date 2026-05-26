@@ -22,7 +22,7 @@ import ProtectedRoute from './ProtectedRoute.jsx';
 let router = createBrowserRouter([
   {
     path: "/",
-    element: <Login />, // Page publique de connexion
+    element: <AuthentificationUnique />, // Page publique de connexion
   },
   {
     path: "/admin",

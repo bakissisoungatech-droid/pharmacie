@@ -315,9 +315,13 @@ function PatientsCRUD() {
           <div className="col-md-2 mb-2">
             <select 
               className="form-select" 
-              value={idConsultation} // Utilise l'état consultation
-              onChange={(e) => setIdConsultation(e.target.value)} // Met à jour l'état consultation
+              value={idConsultation} 
+              onChange={(e) => setIdConsultation(e.target.value)}
+              required
             >
+              {/* ➕ AJOUT de l'option par défaut neutre */}
+              <option value="">-- Choisir une consultation --</option>
+              
               {listeConsultation.map(consul => (
                 <option key={consul.id} value={consul.nom_consul}>{consul.nom_consul}</option>
               ))}

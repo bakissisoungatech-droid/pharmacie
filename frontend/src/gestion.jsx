@@ -9,13 +9,15 @@ import Dashboard from "./pages/dashboard";
 import Abonnement from "./pages/abonnement";
 import Inscription from "./inscription";
 import Login from "./login";
+import AuthentificationUnique from "./login1";
 import Parameteur from "./pages/parameteur";
 
 import DemandeExamen1 from "./pages/DemandeExamen1";
 import ResultatExamen from "./pages/Resultat";
 import ListeResultatsGroupes from "./pages/consultationResultats";
 import Caisse from "./pages/caisse";
-import Inscription1 from "./inscription1";
+// import Inscription1 from "./inscription1";
+import GestionStructures from "./structures";
 
 function Gestion() {
   const [activePage, setActivePage] = useState("dashboard");
@@ -27,10 +29,12 @@ function Gestion() {
         return <Dashboard />;
       case "utilisateurs":
         return <Inscription />;
-      case "utilisateurs1":
-        return <Inscription1 />;
       case "login":
         return <Login />;
+      case "login1":
+        return <AuthentificationUnique />;
+      case "structures":
+        return <GestionStructures />;
       case "consultation":
         return <Consultation />;
       case "patients":
@@ -76,7 +80,7 @@ function Gestion() {
         } d-md-block no-print`}
         style={{ width: "250px" }}
       >
-        <h4 className="text-center mb-3">LABO</h4>
+        <h4 className="text-center mb-3">MEDSOFT</h4>
 
         <ul className="nav flex-column">
           <li>
@@ -181,6 +185,22 @@ function Gestion() {
               className="nav-link text-white btn btn-link"
             >
               Login
+            </button>
+          </li>
+          <li>
+            <button
+              onClick={() => setActivePage("structures")}
+              className="nav-link text-white btn btn-link"
+            >
+              structures
+            </button>
+          </li>
+          <li>
+            <button
+              onClick={() => setActivePage("login1")}
+              className="nav-link text-white btn btn-link"
+            >
+              Login structure
             </button>
           </li>
           <li>

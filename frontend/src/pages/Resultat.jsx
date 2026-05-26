@@ -88,31 +88,41 @@ function ResultatExamen() {
     refreshData();
   }, [refreshData]);
 
-  // --- AJUSTEMENT ICI : CORRESPONDANCE DES COLONNES LORS DE LA SÉLECTION ---
   const handleSelect = (examen) => {
     setIsEditing(false);
     setSelectedExamen(examen);
     setDateResultat(formatForDateTimeLocal(new Date()));
     
     const categorie = examen.categorie ? examen.categorie.toUpperCase() : "";
-    if (categorie.includes("BIOCHIMIE") || categorie.includes("HEMATOLOGIE")) {
-      
-      // Séparation des paramètres
+    const nomExamenUpper = examen.nom_examen ? examen.nom_examen.toUpperCase() : "";
+
+    // Aiguillage Vitesse de Sédimentation (Gérée sous forme de tableau à paramètre unique)
+    if (nomExamenUpper.includes("VITESSE") || nomExamenUpper.includes("SEDIMENTATION") || nomExamenUpper === "VS") {
+      setFormData({
+        parametres: [{
+          parametre: "Vitesse de Sédimentation",
+          nom_parametre: "Vitesse de Sédimentation",
+          resultat: "",
+          valeur: examen.valeurs_defaut || "mm/1ère heure",
+          interpretation: ""
+        }],
+        seroData: { resultat: "", titre: "", valeur: "", interpretation: "" }
+      });
+    }
+    // Biochimie & Hématologie classique
+    else if (categorie.includes("BIOCHIMIE") || categorie.includes("HEMATOLOGIE")) {
       const nomsParams = examen.parametre 
         ? (examen.parametre.includes(';') ? examen.parametre.split(';') : examen.parametre.split(','))
         : [];
 
-      // Séparation des valeurs par défaut correspondantes
       const valeursParams = examen.valeurs_defaut
         ? (examen.valeurs_defaut.includes(';') ? examen.valeurs_defaut.split(';') : examen.valeurs_defaut.split(','))
         : [];
 
-      // Reconstruction d'un tableau d'objets alignés par index
       const newParams = nomsParams.map((p, index) => ({
         parametre: p.trim(),
         nom_parametre: p.trim(),
         resultat: "",
-        // On prend la valeur de référence associée à l'index, sinon "-"
         valeur: valeursParams[index] ? valeursParams[index].trim() : "-",
         interpretation: ""
       }));
@@ -124,9 +134,35 @@ function ResultatExamen() {
     } else {
       setFormData({
         parametres: [],
-        seroData: { resultat: "", titre: examen.nom_examen, valeur: examen.valeurs_defaut || "-", interpretation: "" }
+        seroData: { 
+          resultat: "", 
+          valeur: examen.nom_examen, 
+          titre: examen.nom_examen,  
+          interpretation: "RAS" 
+        }
       });
     }
+  };
+
+  // --- ACTION : AJOUTER UN PARAMÈTRE DIRECTEMENT DANS LE FORMULAIRE ---
+  const ajouterParametre = () => {
+    const nouveauParam = {
+      parametre: "",
+      nom_parametre: "",
+      resultat: "",
+      valeur: "-",
+      interpretation: ""
+    };
+    setFormData({
+      ...formData,
+      parametres: [...formData.parametres, nouveauParam]
+    });
+  };
+
+  // --- ACTION : SUPPRIMER UN PARAMÈTRE DU FORMULAIRE ---
+  const supprimerParametre = (indexASupprimer) => {
+    const nouveauxParams = formData.parametres.filter((_, idx) => idx !== indexASupprimer);
+    setFormData({ ...formData, parametres: nouveauxParams });
   };
 
   const soumettreResultat = async (e) => {
@@ -144,18 +180,21 @@ function ResultatExamen() {
 
       const bioFormatte = {};
       parametresNettoyes.forEach(p => {
-        bioFormatte[p.nom_parametre] = p.resultat;
+        if (p.nom_parametre) {
+          bioFormatte[p.nom_parametre] = p.resultat;
+        }
       });
 
       const payload = {
         id_ligne: selectedExamen.id_ligne,
         id_examen_reel: selectedExamen.id_examen_reel || selectedExamen.id_examen,
+        nom_examen: selectedExamen.nom_examen, // Crucial pour l'aiguillage backend de la VS
         categorie: selectedExamen.categorie,
         valide_par: currentUser.nom,
         date_resultat: dateResultat, 
         bioData: bioFormatte, 
         seroData: formData.seroData,
-        parametres: parametresNettoyes // Contient maintenant les valeurs de référence modifiées ou initiales
+        parametres: parametresNettoyes 
       };
 
       if (isEditing) {
@@ -182,15 +221,28 @@ function ResultatExamen() {
         nom: h.nom_patient || h.nom,
         prenom: h.prenom_patient || h.prenom,
         id_examen_reel: h.id_examen,
+        nom_examen: h.nom_examen,
         categorie: h.categorie
       });
 
       setDateResultat(formatForDateTimeLocal(h.date_resultat));
 
       const res = await axios.get(`${API_URL}/details/${h.id_resultat}`);
-      const categorie = h.categorie ? h.categorie.toUpperCase() : "";
+      const typeReponse = res.data.type;
 
-      if (categorie.includes("BIOCHIMIE") || categorie.includes("HEMATOLOGIE")) {
+      // Gestion du retour d'édition Vitesse de Sédimentation
+      if (typeReponse === "VITESSE_SEDIMENTATION") {
+        const params = res.data.data.map(p => ({
+          parametre: "Vitesse de Sédimentation",
+          nom_parametre: "Vitesse de Sédimentation",
+          resultat: p.resultat,
+          valeur: "mm/1ère heure",
+          interpretation: ""
+        }));
+        setFormData({ parametres: params, seroData: { resultat: "", titre: "", valeur: "", interpretation: "" } });
+      }
+      // Gestion Biochimie / Hématologie
+      else if (typeReponse === "BIOCHIMIE") {
         const params = res.data.data.map(p => ({
           parametre: p.nom_parametre,
           nom_parametre: p.nom_parametre,
@@ -199,7 +251,9 @@ function ResultatExamen() {
           interpretation: p.interpretation || ""
         }));
         setFormData({ parametres: params, seroData: { resultat: "", titre: "", valeur: "", interpretation: "" } });
-      } else {
+      } 
+      // Gestion Sérologie
+      else {
         if(res.data.data && res.data.data.length > 0) {
           setFormData({ parametres: [], seroData: res.data.data[0] });
         }
@@ -231,6 +285,14 @@ function ResultatExamen() {
       `${h.nom_patient} ${h.prenom_patient} ${h.nom_examen}`.toLowerCase().includes(searchHistorique.toLowerCase())
     );
   }, [historique, searchHistorique]);
+
+  // Détermination de l'affichage du bloc Tableau de Paramètres (vrai si Biochimie, Hématologie OU Vitesse de sédimentation)
+  const isTableauParametresVisible = useMemo(() => {
+    if (!selectedExamen) return false;
+    const cat = selectedExamen.categorie?.toUpperCase() || "";
+    const nom = selectedExamen.nom_examen?.toUpperCase() || "";
+    return cat.includes("BIOCHIMIE") || cat.includes("HEMATOLOGIE") || nom.includes("VITESSE") || nom.includes("SEDIMENTATION") || nom === "VS";
+  }, [selectedExamen]);
 
   return (
     <div className="container-fluid p-4">
@@ -301,7 +363,9 @@ function ResultatExamen() {
                 <div className="alert alert-light border mb-3 py-2 px-3 small">
                   📋 Patient : <strong className="text-uppercase">{selectedExamen.nom}</strong> {selectedExamen.prenom}
                   <br />
-                   👤 Opérateur : <strong>{currentUser?.nom || 'Non connecté'}</strong>
+                   Unité de soin : <strong>{selectedExamen.categorie || 'Non spécifiée'}</strong>
+                  <br />
+                   Opérateur : <strong>{currentUser?.nom || 'Non connecté'}</strong>
                 </div>
 
                 <div className="row mb-3 p-2 bg-light rounded border mx-0">
@@ -317,58 +381,159 @@ function ResultatExamen() {
                   </div>
                 </div>
 
-                {/* TABLEAU PARAMÈTRES REAJUSTÉ */}
-                {(selectedExamen.categorie?.toUpperCase().includes("BIOCHIMIE") || selectedExamen.categorie?.toUpperCase().includes("HEMATOLOGIE")) && (
-                  <div className="table-responsive">
-                    <table className="table table-sm align-middle table-bordered">
-                      <thead className="table-light">
-                        <tr>
-                          <th>Nom du Paramètre</th>
-                          <th style={{ width: '30%' }}>Résultat</th>
-                          <th style={{ width: '35%' }}>Valeurs de Référence</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {formData.parametres.map((p, idx) => (
-                          <tr key={idx}>
-                            <td className="fw-bold text-secondary">{p.parametre || p.nom_parametre}</td>
-                            <td>
-                              <input type="text" className="form-control form-control-sm border-primary" required value={p.resultat} onChange={(e) => {
-                                const newParams = [...formData.parametres];
-                                newParams[idx].resultat = e.target.value;
-                                setFormData({ ...formData, parametres: newParams });
-                              }}/>
-                            </td>
-                            <td>
-                              {/* Liaison directe avec l'index de valeurs_defaut */}
-                              <input type="text" className="form-control form-control-sm" value={p.valeur || ""} onChange={(e) => {
-                                const newParams = [...formData.parametres];
-                                newParams[idx].valeur = e.target.value; 
-                                setFormData({ ...formData, parametres: newParams });
-                              }}/>
-                            </td>
+                {/* TABLEAU PARAMÈTRES MIS À JOUR POUR PRENDRE EN CHARGE LA VS */}
+                {isTableauParametresVisible && (
+                  <div>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h5 className="mb-0 text-secondary fw-bold">Paramètres de l'examen</h5>
+                      <button 
+                        type="button" 
+                        className="btn btn-sm btn-outline-primary fw-bold"
+                        onClick={ajouterParametre}
+                      >
+                        ➕ Ajouter un paramètre
+                      </button>
+                    </div>
+
+                    <div className="table-responsive">
+                      <table className="table table-sm align-middle table-bordered">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Nom du Paramètre</th>
+                            <th style={{ width: '25%' }}>Résultat</th>
+                            <th style={{ width: '30%' }}>Valeurs de Référence</th>
+                            <th style={{ width: '10%' }} className="text-center">Action</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {formData.parametres.map((p, idx) => (
+                            <tr key={idx}>
+                              <td>
+                                <input 
+                                  type="text" 
+                                  className="form-control form-control-sm border-0 fw-bold bg-transparent" 
+                                  placeholder="Nom du paramètre..." 
+                                  required
+                                  value={p.parametre || p.nom_parametre || ""} 
+                                  onChange={(e) => {
+                                    const newParams = [...formData.parametres];
+                                    newParams[idx].parametre = e.target.value;
+                                    newParams[idx].nom_parametre = e.target.value;
+                                    setFormData({ ...formData, parametres: newParams });
+                                  }}
+                                />
+                              </td>
+                              <td>
+                                <input type="text" className="form-control form-control-sm border-primary" required value={p.resultat} onChange={(e) => {
+                                  const newParams = [...formData.parametres];
+                                  newParams[idx].resultat = e.target.value;
+                                  setFormData({ ...formData, parametres: newParams });
+                                }}/>
+                              </td>
+                              <td>
+                                <input type="text" className="form-control form-control-sm" value={p.valeur || ""} onChange={(e) => {
+                                  const newParams = [...formData.parametres];
+                                  newParams[idx].valeur = e.target.value; 
+                                  setFormData({ ...formData, parametres: newParams });
+                                }}/>
+                              </td>
+                              <td className="text-center">
+                                <button 
+                                  type="button" 
+                                  className="btn btn-sm btn-link text-danger p-0"
+                                  onClick={() => supprimerParametre(idx)}
+                                  title="Supprimer ce paramètre"
+                                >
+                                  ❌
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
 
-                {/* BLOC SÉROLOGIE */}
-                {selectedExamen.categorie?.toUpperCase().includes("SEROLOGIE") && (
-                  <div className="row g-3 p-2 border rounded bg-light">
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">Examen effectué</label>
-                      <input type="text" className="form-control" value={formData.seroData.titre || ""} readOnly />
+                {/* BLOC SÉROLOGIE / BIOLOGIE (Exclut implicitement la VS puisque gérée en haut) */}
+                {(selectedExamen.categorie?.toUpperCase().includes("BIOLOGIE") && !isTableauParametresVisible) && (
+                  <div className="row g-3 p-3 border rounded bg-light">
+                    <div className="col-md-4">
+                      <div className="mb-2">
+                        <label className="form-label fw-bold text-muted">Examen (Valeur fixe)</label>
+                        <input 
+                          type="text" 
+                          className="form-control bg-white text-secondary" 
+                          value={formData.seroData.valeur || ""} 
+                          readOnly 
+                        />
+                      </div>
                     </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold text-primary">Verdict Diagnostic</label>
-                      <select className="form-select border-primary fw-bold" required value={formData.seroData.resultat || ""}
-                        onChange={(e) => setFormData({ ...formData, seroData: { ...formData.seroData, resultat: e.target.value }})}>
-                        <option value="">-- Choisir le résultat --</option>
-                        <option value="NEGATIF">🔴 NÉGATIF</option>
-                        <option value="POSITIF">🟢 POSITIF</option>
-                      </select>
+
+                    <div className="col-md-4">
+                      <div className="mb-2">
+                        <label className="form-label fw-bold text-primary">Verdict Diagnostic</label>
+                        <select 
+                          className="form-select border-primary fw-bold" 
+                          required 
+                          value={formData.seroData.resultat || ""}
+                          onChange={(e) => {
+                            const nouveauVerdict = e.target.value;
+                            let nouveauTitre = formData.seroData.titre;
+                            
+                            if (nouveauVerdict === "NEGATIF") {
+                              nouveauTitre = formData.seroData.valeur;
+                            }
+
+                            setFormData({
+                              ...formData,
+                              seroData: { 
+                                ...formData.seroData, 
+                                resultat: nouveauVerdict,
+                                titre: nouveauTitre
+                              }
+                            });
+                          }}
+                        >
+                          <option value="">-- Choisir le résultat --</option>
+                          <option value="NEGATIF">🔴 NÉGATIF</option>
+                          <option value="POSITIF">🟢 POSITIF</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="col-md-4">
+                      <div className="mb-2">
+                        <label className="form-label fw-bold">Titre (Paramètre/Spécification)</label>
+                        <input 
+                          type="text" 
+                          className={`form-control ${formData.seroData.resultat === "NEGATIF" ? "bg-light text-muted" : "border-warning fw-bold"}`}
+                          value={formData.seroData.titre || ""} 
+                          disabled={formData.seroData.resultat === "NEGATIF" || !formData.seroData.resultat}
+                          placeholder="Spécifier si Positif..."
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            seroData: { ...formData.seroData, titre: e.target.value }
+                          })}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-md-12">
+                      <div className="mb-0">
+                        <label className="form-label fw-bold">Interprétation / Conclusion</label>
+                        <textarea 
+                          className="form-control" 
+                          rows="2"
+                          placeholder="Commentaire ou observation optionnelle..."
+                          value={formData.seroData.interpretation || ""}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            seroData: { ...formData.seroData, interpretation: e.target.value }
+                          })}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

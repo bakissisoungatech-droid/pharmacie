@@ -50,32 +50,36 @@ router.get("/en_attente", async (req, res) => {
   }
 });
 
-// --- 2. RÉCUPÉRER LES DÉTAILS D'UN RÉSULTAT (CRUCIAL POUR LA MODIFICATION) ---
+// --- 2. RÉCUPÉRER LES DÉTAILS D'UN RÉSULTAT (ADAPTÉ POUR VS) ---
 router.get("/details/:id_resultat", async (req, res) => {
   try {
     const { id_resultat } = req.params;
     
-    // On vérifie d'abord si c'est de la biochimie
+    // 1. Vérification Vitesse de Sédimentation
+    const vs = await pool.query("SELECT * FROM resultat_vitesse_sedimentation WHERE id_resultat = $1", [id_resultat]);
+    if (vs.rows.length > 0) return res.json({ type: "VITESSE_SEDIMENTATION", data: vs.rows });
+
+    // 2. Vérification Biochimie / Hématologie
     const bio = await pool.query("SELECT * FROM resultat_biochimie WHERE id_resultat = $1", [id_resultat]);
     if (bio.rows.length > 0) return res.json({ type: "BIOCHIMIE", data: bio.rows });
 
-    // Sinon on cherche en sérologie
-    const sero = await pool.query("SELECT * FROM resultat_serologie WHERE id_resultat = $1", [id_resultat]);
-    res.json({ type: "SEROLOGIE", data: sero.rows });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    // 3. Sinon Sérologie / Biologie générale
+    const sero = await pool.query("SELECT * FROM resultat_biologie WHERE id_resultat = $1", [id_resultat]);
+    res.json({ type: "biologie", data: sero.rows });
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
-// --- 3. ENREGISTREMENT (POST) ---
+// --- 3. ENREGISTREMENT (POST ADAPTÉ POUR VS) ---
 router.post("/", async (req, res) => {
   const client = await pool.connect();
   try {
-    const { id_ligne, id_examen_reel, bioData, seroData, categorie, valide_par, date_resultat } = req.body;
+    const { id_ligne, id_examen_reel, nom_examen, bioData, seroData, categorie, valide_par, date_resultat } = req.body;
     await client.query("BEGIN");
 
-    // Si une date personnalisée est fournie, on l'applique, sinon CURRENT_TIMESTAMP
     const dateSaisie = date_resultat ? date_resultat : new Date();
 
-    // Insertion avec prise en compte de la date choisie par l'utilisateur
     const resParent = await client.query(
       `INSERT INTO resultat_examen (id_ligne, id_examen, date_resultat, valide_par) 
        VALUES ($1, $2, $3, $4) RETURNING id_resultat`,
@@ -84,7 +88,20 @@ router.post("/", async (req, res) => {
     const id_resultat = resParent.rows[0].id_resultat;
 
     const catUpper = categorie ? categorie.toUpperCase() : "";
-    if (catUpper.includes("BIOCHIMIE") || catUpper.includes("HEMATOLOGIE")) {
+    const nomUpper = nom_examen ? nom_examen.toUpperCase() : "";
+
+    // Aiguillage Vitesse de Sédimentation (par nom ou catégorie)
+    if (nomUpper.includes("VITESSE") || nomUpper.includes("SEDIMENTATION") || nomUpper === "VS" || catUpper.includes("urinaire")) {
+      // On extrait la valeur depuis bioData ou seroData selon comment ton front l'envoie
+      const valeurVs = bioData?.["Vitesse de Sédimentation"] || bioData?.["VS"] || Object.values(bioData)[0] || "";
+      
+      await client.query(
+        `INSERT INTO resultat_vitesse_sedimentation (id_resultat, resultat) VALUES ($1, $2)`,
+        [id_resultat, valeurVs]
+      );
+    } 
+    // Biochimie & Hématologie standard
+    else if (catUpper.includes("BIOCHIMIE") || catUpper.includes("HEMATOLOGIE")) {
       if (bioData && Object.keys(bioData).length > 0) {
         for (const [nom, valeurResultat] of Object.entries(bioData)) {
           await client.query(
@@ -94,11 +111,24 @@ router.post("/", async (req, res) => {
           );
         }
       }
-    } else {
+    } 
+    // Biologie générale / Sérologie (Verdict Positif/Négatif)
+    else {
+      let titreFinal = seroData?.titre;
+      if (seroData?.resultat === "NEGATIF") {
+        titreFinal = seroData?.valeur;
+      }
+
       await client.query(
-        `INSERT INTO resultat_serologie (id_resultat, resultat, titre, valeur, interpretation) 
+        `INSERT INTO resultat_biologie (id_resultat, resultat, titre, valeur, interpretation) 
          VALUES ($1, $2, $3, $4, $5)`,
-        [id_resultat, seroData?.resultat, seroData?.titre, seroData?.valeur, seroData?.interpretation || "RAS"]
+        [
+          id_resultat, 
+          seroData?.resultat, 
+          titreFinal, 
+          seroData?.valeur, 
+          seroData?.interpretation || "RAS"
+        ]
       );
     }
 
@@ -115,15 +145,14 @@ router.post("/", async (req, res) => {
   }
 });
 
-// --- 4. MODIFICATION (PUT) ---
+// --- 4. PUT : MODIFICATION (ADAPTÉ POUR VS) ---
 router.put("/:id_resultat", async (req, res) => {
   const { id_resultat } = req.params;
-  const { categorie, parametres, seroData, valide_par, date_resultat } = req.body;
+  const { categorie, nom_examen, parametres, seroData, valide_par, date_resultat } = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     
-    // On met à jour l'opérateur ET la date d'enregistrement commune
     const dateSaisie = date_resultat ? date_resultat : new Date();
     
     await client.query(
@@ -134,7 +163,22 @@ router.put("/:id_resultat", async (req, res) => {
     );
     
     const catUpper = categorie ? categorie.toUpperCase() : "";
-    if (catUpper.includes("BIOCHIMIE") || catUpper.includes("HEMATOLOGIE")) {
+    const nomUpper = nom_examen ? nom_examen.toUpperCase() : "";
+
+    // Modification Vitesse de Sédimentation
+    if (nomUpper.includes("VITESSE") || nomUpper.includes("SEDIMENTATION") || nomUpper === "VS") {
+      await client.query(`DELETE FROM resultat_vitesse_sedimentation WHERE id_resultat = $1`, [id_resultat]);
+      
+      const vsParam = parametres && parametres[0];
+      if (vsParam) {
+        await client.query(
+          `INSERT INTO resultat_vitesse_sedimentation (id_resultat, resultat) VALUES ($1, $2)`,
+          [id_resultat, vsParam.resultat]
+        );
+      }
+    } 
+    // Modification Biochimie / Hématologie
+    else if (catUpper.includes("BIOCHIMIE") || catUpper.includes("HEMATOLOGIE")) {
       await client.query(`DELETE FROM resultat_biochimie WHERE id_resultat = $1`, [id_resultat]);
       
       if (parametres && parametres.length > 0) {
@@ -149,12 +193,25 @@ router.put("/:id_resultat", async (req, res) => {
           }
         }
       }
-    } else {
+    } 
+    // Modification Sérologie
+    else {
+      let titreFinal = seroData?.titre;
+      if (seroData?.resultat === "NEGATIF") {
+        titreFinal = seroData?.valeur;
+      }
+
       await client.query(
-        `UPDATE resultat_serologie 
+        `UPDATE resultat_biologie 
          SET resultat=$1, titre=$2, valeur=$3, interpretation=$4 
          WHERE id_resultat=$5`, 
-        [seroData?.resultat, seroData?.titre, seroData?.valeur, seroData?.interpretation, id_resultat]
+        [
+          seroData?.resultat, 
+          titreFinal, 
+          seroData?.valeur, 
+          seroData?.interpretation || "RAS", 
+          id_resultat
+        ]
       );
     }
     
@@ -169,9 +226,11 @@ router.put("/:id_resultat", async (req, res) => {
   }
 });
 
-// --- 5. SUPPRESSION & HISTORIQUE (Déjà présents dans ton code) ---
+// --- 5. SUPPRESSION & HISTORIQUE ---
 router.delete("/:id_resultat", async (req, res) => {
   try {
+    // Grâce au ON DELETE CASCADE configuré en SQL, la suppression dans resultat_examen 
+    // supprimera automatiquement la ligne liée dans resultat_vitesse_sedimentation.
     await pool.query("DELETE FROM resultat_examen WHERE id_resultat = $1", [req.params.id_resultat]);
     notifyRefresh(req);
     res.json({ success: true });
@@ -225,11 +284,10 @@ router.get("/complets", async (req, res) => {
           d.id_demande, 
           d.date_demande,
           e.categorie, 
-          e.nom_examen,       -- TRÈS IMPORTANT pour l'éclatement des tableaux
-          e.sous_categories,   -- Actuellement vide ("") d'après ton debug
+          e.nom_examen,
           
-          COALESCE(rb.nom_parametre, e.nom_examen) AS nom_parametre,
-          rb.resultat AS valeur_resultat,
+          COALESCE(rb.nom_parametre, rvs.id_resultat::text, e.nom_examen) AS nom_parametre,
+          COALESCE(rb.resultat, rvs.resultat) AS valeur_resultat,
           rb.valeur AS norme_reference
           
       FROM resultat_examen r
@@ -238,6 +296,7 @@ router.get("/complets", async (req, res) => {
       JOIN patient p ON d.id_patient = p.id_patient
       JOIN examen e ON l.id_examen = e.id_examen
       LEFT JOIN resultat_biochimie rb ON r.id_resultat = rb.id_resultat
+      LEFT JOIN resultat_vitesse_sedimentation rvs ON r.id_resultat = rvs.id_resultat
       
       ORDER BY d.id_demande DESC, e.categorie ASC, e.nom_examen ASC;
     `;

@@ -350,107 +350,154 @@ function DemandeExamen() {
 
             {/* Modals obsolètes ou non modifiés cachés pour la clarté */}
             
-{/* --- MODAL : RECHERCHE DANS LE CATALOGUE --- */}
+            {/* --- MODAL : RECHERCHE DANS LE CATALOGUE --- */}
+            <div className="modal fade no-print" id="modalExamenUniversel" tabIndex="-1">
+                <div className="modal-dialog modal-md">
+                    <div className="modal-content border-0 shadow">
+                        <div className="modal-header bg-dark text-white">
+                            <h5 className="modal-title font-monospace">Recherche universelle d'examens</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="input-group mb-3">
+                                <span className="input-group-text bg-light">🔍</span>
+                                <input 
+                                    type="text" 
+                                    className="form-control" 
+                                    placeholder="Tapez le nom de l'examen (Ex: NFS, Scanner, Glycémie...)" 
+                                    value={searchExamenModal}
+                                    onChange={(e) => setSearchExamenModal(e.target.value)}
+                                />
+                            </div>
 
-<div className="modal fade no-print" id="modalExamenUniversel" tabIndex="-1">
+                            <div style={{maxHeight: '350px', overflowY: 'auto'}}>
+                                {examensDispo.length > 0 ? examensDispo.map(ex => {
+                                    const isChecked = examensChoisis.some(e => e.id_examen_univ === ex.id_examen_univ);
+                                    return (
+                                        <div key={ex.id_examen_univ} className="d-flex justify-content-between align-items-center border-bottom py-2 px-1">
+                                            <div>
+                                                <div className="fw-bold text-dark">{ex.nom}</div>
+                                                <span className="badge bg-light text-secondary border">{ex.categorie}</span>
+                                            </div>
+                                            <input 
+                                                className="form-check-input" 
+                                                type="checkbox" 
+                                                style={{width: '1.4em', height: '1.4em', cursor: 'pointer'}} 
+                                                checked={isChecked} 
+                                                onChange={() => handleSelectExamen(ex)} 
+                                            />
+                                        </div>
+                                    );
+                                }) : (
+                                    <p className="text-center text-muted py-3 small">Aucun examen trouvé. Saisissez un mot clé.</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-dark w-100 fw-bold" data-bs-dismiss="modal">
+                                Valider la liste ({examensChoisis.length} sélectionné(s))
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-<div className="modal-dialog modal-md">
+            {/* --- MODAL : DÉTAILS DE LA PRESCRIPTION + IMPRESSION --- */}
+            <div className="modal fade" id="modalDetails" tabIndex="-1">
+                <div className="modal-dialog modal-lg">
+                    <div className="modal-content border-0 shadow">
+                        <div className="modal-header bg-primary text-white no-print">
+                            <h5 className="modal-title">📌 Prescription Médicale de : {detailDemande?.nom}</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        
+                        {/* Conteneur global du corps du modal ciblé par l'impression */}
+                        <div className="modal-body" id="print-modal-area">
+                            {detailDemande && (
+                                <>
+                                    {/* --- TON ENTÊTE D'IMPRESSION --- */}
+                                    <div className="d-none d-print-block p-1">
+                                        <div className="row align-items-center border-bottom pb-3">
+                                            <div className="col-4">
+                                                <div className="d-flex align-items-center">
+                                                    {/* Vérifiez que la variable "Logo" contient votre image */}
+                                                    {typeof Logo !== 'undefined' && <img src={Logo} style={{ width: '80px' }} alt="Logo" />}
+                                                    <h4 className="fw-bold text-uppercase ms-2 mb-0">destiny express</h4>
+                                                </div>
+                                                <p className="small mb-0 mt-2">votre santé notre priorité</p>
+                                                <p className="small mb-0">Tél : +242 XX XXX XX XX</p>
+                                            </div>
+                                            <div className="col-4 text-center">
+                                                <h2 className="text-uppercase fw-bold">Rapport</h2>
+                                            </div>
+                                            <div className="col-4 text-end">
+                                                <p className="mb-0">Date d'édition : {new Date().toLocaleDateString()}</p>
+                                                <p className="mb-0">Heure : {new Date().toLocaleTimeString()}</p>
+                                            </div>
+                                        </div>
 
-<div className="modal-content border-0 shadow">
+                                        {/* BLOC INFOS PATIENT INTÉGRÉ AVEC LES PARAMÈTRES DU COMPOSANT */}
+                                        <div className="row my-3 p-2 bg-light rounded border" style={{ fontSize: "14px" }}>
+                                            <div className="col-6">
+                                                <p className="mb-1"><strong>Nom & Prénom :</strong> {detailDemande.nom} {detailDemande.prenom}</p>
+                                                <p className="mb-0"><strong>Date de la demande :</strong> {detailDemande.date_prescription ? new Date(detailDemande.date_prescription).toLocaleDateString() : "-"}</p>
+                                            </div>
+                                            <div className="col-6 text-end">
+                                                <p className="mb-1"><strong>Médecin :</strong> {detailDemande.medecin || "-"}</p>
+                                                <p className="mb-0"><strong>ID :</strong> #{detailDemande.id_prescription}</p>
+                                            </div>
+                                        </div>
 
-<div className="modal-header bg-dark text-white">
+                                        <h3 className="text-center mt-3 text-decoration-underline mb-4">SERVICE LABORATOIRE</h3>
+                                    </div>
 
-<h5 className="modal-title font-monospace">Recherche universelle d'examens</h5>
+                                    {/* --- CONTENU DU MODAL POUR L'ECRAN (Aperçu) --- */}
+                                    <div className="row g-3 mb-4 p-3 bg-light rounded border no-print">
+                                        <div className="col-6"><strong>Patient:</strong> {detailDemande.nom} {detailDemande.prenom}</div>
+                                        <div className="col-6"><strong>Prescripteur:</strong> {detailDemande.medecin}</div>
+                                        <div className="col-6"><strong>Date:</strong> {new Date(detailDemande.date_prescription).toLocaleString()}</div>
+                                        <div className="col-12"><strong>Motif clinique:</strong> <p className="mb-0 text-muted">{detailDemande.motif_notes || "Aucun motif spécifié"}</p></div>
+                                    </div>
+                                    
+                                    {/* --- TABLEAU DES EXAMENS (Visible à l'écran et à l'impression) --- */}
+                                    <h6 className="fw-bold border-bottom pb-2">🧪 Examens prescrits</h6>
+                                    <table className="table table-striped table-bordered mt-2">
+                                        <thead>
+                                            <tr>
+                                                <th>Nom de l'examen</th>
+                                                <th>Catégorie</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {lignesDetail.map((l, i) => (
+                                                <tr key={i}>
+                                                    <td>{l.nom_examen}</td>
+                                                    <td><span className="badge bg-secondary d-print-none">{l.categorie}</span><span className="d-none d-print-inline">{l.categorie}</span></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
 
-<button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-
-</div>
-
-<div className="modal-body">
-
-<div className="input-group mb-3">
-
-<span className="input-group-text bg-light">🔍</span>
-
-<input
-
-type="text"
-
-className="form-control"
-
-placeholder="Tapez le nom de l'examen (Ex: NFS, Scanner, Glycémie...)"
-
-value={searchExamenModal}
-
-onChange={(e) => setSearchExamenModal(e.target.value)}
-
-/>
-
-</div>
-
-
-
-<div style={{maxHeight: '350px', overflowY: 'auto'}}>
-
-{examensDispo.length > 0 ? examensDispo.map(ex => {
-
-const isChecked = examensChoisis.some(e => e.id_examen_univ === ex.id_examen_univ);
-
-return (
-
-<div key={ex.id_examen_univ} className="d-flex justify-content-between align-items-center border-bottom py-2 px-1">
-
-<div>
-
-<div className="fw-bold text-dark">{ex.nom}</div>
-
-<span className="badge bg-light text-secondary border">{ex.categorie}</span>
-
-</div>
-
-<input
-
-className="form-check-input"
-
-type="checkbox"
-
-style={{width: '1.4em', height: '1.4em', cursor: 'pointer'}}
-
-checked={isChecked}
-
-onChange={() => handleSelectExamen(ex)}
-
-/>
-
-</div>
-
-);
-
-}) : (
-
-<p className="text-center text-muted py-3 small">Aucun examen trouvé. Saisissez un mot clé.</p>
-
-)}
-
-</div>
-
-</div>
-
-<div className="modal-footer">
-
-<button className="btn btn-dark w-100 fw-bold" data-bs-dismiss="modal">
-
-Valider la liste ({examensChoisis.length} sélectionné(s))
-
-</button>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
+                                    {detailDemande.motif_notes && (
+                                        <div className="d-none d-print-block mt-4">
+                                            <strong>Renseignements cliniques :</strong>
+                                            <p className="text-muted p-2 border rounded bg-light">{detailDemande.motif_notes}</p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                        
+                        {/* Pied de page du modal avec le bouton d'impression */}
+                        <div className="modal-footer bg-light no-print">
+                            <button className="btn btn-primary px-4 fw-bold me-auto" onClick={handlePrint}>
+                                🖨️ Imprimer la fiche
+                            </button>
+                            <button className="btn btn-secondary px-4" data-bs-dismiss="modal">Fermer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

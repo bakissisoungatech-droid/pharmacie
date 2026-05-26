@@ -41,14 +41,22 @@ router.get("/", async (req, res) => {
 router.get("/lignes/:id", async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT el.*, eu.nom AS nom_examen, eu.categorie
+      SELECT 
+        el.*, 
+        eu.nom AS nom_examen, 
+        eu.categorie,
+        p.id_patient,                 -- 👈 Déjà présent
+        p.medecin                     -- ➕ AJOUT : On récupère le nom du médecin de la table parente
       FROM prescription_examen_ligne el
       JOIN examen_universel eu ON el.id_examen_univ = eu.id_examen_univ
+      JOIN prescription_examen p ON el.id_prescription = p.id_prescription 
       WHERE el.id_prescription = $1
     `, [req.params.id]);
+    
     res.json(r.rows);
   } catch (err) {
-    res.status(500).json({ error: "Erreur serveur" });
+    console.error(err);
+    res.status(500).json({ error: "Erreur serveur lors de la récupération des lignes" });
   }
 });
 
