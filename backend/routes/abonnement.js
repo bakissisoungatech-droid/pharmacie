@@ -7,7 +7,7 @@ const notifyRefresh = (req) => {
   if (io) io.emit("abonnement_updated");
 };
 
-// --- 1. GET : Récupérer les abonnements (Sans est_actif) ---
+// --- 1. GET : Récupérer les abonnements (Avec la colonne taux) ---
 router.get("/", async (req, res) => {
   const id_structure = req.headers["id_structure"] || req.query.id_structure;
 
@@ -17,7 +17,7 @@ router.get("/", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id_abonnement, nom, telephone, adresse, date_creation, id_structure 
+      `SELECT id_abonnement, nom, telephone, adresse, taux, date_creation, id_structure 
        FROM abonnement 
        WHERE id_structure = $1 
        ORDER BY date_creation DESC`,
@@ -30,19 +30,22 @@ router.get("/", async (req, res) => {
   }
 });
 
-// --- 2. POST : Créer un abonné (Sans est_actif) ---
+// --- 2. POST : Créer un abonné (Avec taux par défaut) ---
 router.post("/post", async (req, res) => {
-  const { nom, telephone, adresse, id_structure } = req.body;
+  const { nom, telephone, adresse, taux, id_structure } = req.body;
 
   if (!id_structure) {
     return res.status(400).json({ error: "Impossible de créer un abonnement sans identifiant de structure." });
   }
 
+  // Si aucun taux n'est fourni, on applique 0 par défaut
+  const tauxValeur = taux !== undefined && taux !== "" ? taux : 0;
+
   try {
     const result = await pool.query(
-      `INSERT INTO abonnement (nom, telephone, adresse, id_structure) 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [nom, telephone, adresse, id_structure]
+      `INSERT INTO abonnement (nom, telephone, adresse, taux, id_structure) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [nom, telephone, adresse, tauxValeur, id_structure]
     );
 
     notifyRefresh(req);
@@ -57,22 +60,24 @@ router.post("/post", async (req, res) => {
   }
 });
 
-// --- 3. PUT : Modifier un abonnement ---
+// --- 3. PUT : Modifier un abonnement (Avec taux mis à jour) ---
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { nom, telephone, adresse, id_structure } = req.body;
+  const { nom, telephone, adresse, taux, id_structure } = req.body;
 
   if (!id_structure) {
     return res.status(400).json({ error: "L'identifiant de la structure est requis pour modifier un abonnement." });
   }
 
+  const tauxValeur = taux !== undefined && taux !== "" ? taux : 0;
+
   try {
     const result = await pool.query(
       `UPDATE abonnement 
-       SET nom = $1, telephone = $2, adresse = $3 
-       WHERE id_abonnement = $4 AND id_structure = $5 
+       SET nom = $1, telephone = $2, adresse = $3, taux = $4
+       WHERE id_abonnement = $5 AND id_structure = $6 
        RETURNING *`, 
-      [nom, telephone, adresse, id, id_structure]
+      [nom, telephone, adresse, tauxValeur, id, id_structure]
     );
     
     if (result.rowCount === 0) {

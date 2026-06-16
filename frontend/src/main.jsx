@@ -1,36 +1,41 @@
-import { StrictMode } from 'react'
-import ReactDOM from 'react-dom/client'
+import { StrictMode } from 'react';
+import ReactDOM from 'react-dom/client';
 import {
   createBrowserRouter,
   RouterProvider,
   Navigate,
 } from "react-router-dom";
-import './index.css'
+import './index.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-// Vos imports de composants
 import AuthentificationUnique from './login1.jsx';
-import Login from './login.jsx';
-import GestionPharmacie from './gestion.jsx';        // Proprio / Global
+import Login from './login.jsx'; // Assurez-vous d'utiliser le bon composant ici si nécessaire
+import Gestion from './gestion.jsx'; 
+import Gestion1 from './gestion1.jsx';       
 
-// Import du gardien de sécurité
 import ProtectedRoute from './ProtectedRoute.jsx';
 
 let router = createBrowserRouter([
   {
     path: "/",
-    element: <AuthentificationUnique />,
-    // element: <GestionPharmacie />, // Page publique de connexion
+    element: <AuthentificationUnique />, 
   },
   {
     path: "/gestion",
     element: (
-      <ProtectedRoute >
-        <GestionPharmacie />
+      <ProtectedRoute allowedRoles={["employe", "caissier", "admin", "pharmacien"]}>
+        <Gestion />
       </ProtectedRoute>
     ),
   },
-
+  {
+    path: "/gestion1",
+    element: (
+      <ProtectedRoute allowedRoles={["proprio"]}>
+        <Gestion1 />
+      </ProtectedRoute>
+    ),
+  },
   {
     path: "*",
     element: <Navigate to="/" replace />,
@@ -42,8 +47,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <RouterProvider router={router} />
   </StrictMode>
 );
-// createRoot(document.getElementById('root')).render(
-//   <StrictMode>
-//     <Gestion />
-//   </StrictMode>,
-// )

@@ -8,11 +8,9 @@ const notifyRefresh = (req) => {
 };
 
 // --- 1. CRÉATION D'UNE VENTE (POST) ---
-// Gère le passage en caisse, le déstockage intelligent par lot (FEFO) et l'historique
 router.post("/", async (req, res) => {
-  // Modification ici : on cherche dans le body OU dans les headers
   const id_structure = req.body.id_structure || req.headers["id_structure"];
-  const { id_utilisateur, mode_paiement, articles } = req.body;
+  const { id_utilisateur, mode_paiement, articles, taux_reduction: reductionGlobale } = req.body;
 
   if (!id_structure) {
     return res.status(400).json({ error: "L'identifiant de la structure est requis." });
@@ -21,19 +19,28 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Aucun article sélectionné pour la vente." });
   }
 
+  // Détermination sécurisée du taux de réduction applicable reçu du client (ex: 12.5)
+  const tauxReduction = Math.max(0, Math.min(100, parseFloat(reductionGlobale) || 0.00));
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    let totalSommeVente = 0;
+    let totalSansReduction = 0;
+    let totalPriseEnCharge = 0;
+    let totalSommeVente = 0; // Reste à charge réel payé par le client à la caisse
+    
     const detailsAInserer = [];
 
-    // Boucle sur chaque article demandé à la caisse
     for (const article of articles) {
       const { id_produit, quantite: quantiteDemandee } = article;
-      let quantiteRestanteAEnlever = quantiteDemandee;
+      let quantiteRestanteAEnlever = parseInt(quantiteDemandee, 10);
 
-      // 1. Récupérer le prix unitaire actuel du produit pour cette structure
+      if (isNaN(quantiteRestanteAEnlever) || quantiteRestanteAEnlever <= 0) {
+        throw new Error(`Quantité invalide reçue pour le produit.`);
+      }
+
+      // 1. Récupérer le prix de vente public d'origine
       const prodRes = await client.query(
         "SELECT prix_vente_unitaire, nom FROM produits WHERE id_produit = $1 AND id_structure = $2",
         [id_produit, id_structure]
@@ -43,67 +50,79 @@ router.post("/", async (req, res) => {
         throw new Error(`Produit introuvable ou non autorisé.`);
       }
 
-      const prixVenteUnitaire = parseFloat(prodRes.rows[0].prix_vente_unitaire);
+      const prixUnitaireBase = parseFloat(prodRes.rows[0].prix_vente_unitaire);
       const nomProduit = prodRes.rows[0].nom;
 
-      // 2. Récupérer les lots disponibles pour ce produit, triés par date de péremption la plus proche (FEFO)
+      // 2. Récupérer les lots par FEFO (Premier expiré, premier sorti)
       const lotsRes = await client.query(
-        `SELECT id_lot, quantite_disponible, date_peremption 
+        `SELECT id_lot, quantite_disponible 
          FROM lots_stock 
          WHERE id_produit = $1 AND id_structure = $2 AND quantite_disponible > 0 AND date_peremption >= CURRENT_DATE
          ORDER BY date_peremption ASC`,
         [id_produit, id_structure]
       );
 
-      // Calculer le stock total disponible toutes dates confondues
-      const stockTotalDisponible = lotsRes.rows.reduce((sum, row) => sum + row.quantite_disponible, 0);
+      const stockTotalDisponible = lotsRes.rows.reduce((sum, row) => sum + parseInt(row.quantite_disponible, 10), 0);
 
-      if (stockTotalDisponible < quantiteDemandee) {
-        throw new Error(`Stock insuffisant pour le produit : ${nomProduit}. Disponible: ${stockTotalDisponible}, Demandé: ${quantiteDemandee}`);
+      if (stockTotalDisponible < quantiteRestanteAEnlever) {
+        throw new Error(`Stock insuffisant pour le produit : ${nomProduit}. Disponible: ${stockTotalDisponible}, Demandé: ${quantiteRestanteAEnlever}`);
       }
 
-      // 3. Vider les lots un par un jusqu'à satisfaction de la quantité demandée
+      // 3. Déstockage par lot et calculs financiers
       for (const lot of lotsRes.rows) {
         if (quantiteRestanteAEnlever <= 0) break;
 
-        const quantitePriseDansCeLot = Math.min(lot.quantite_disponible, quantiteRestanteAEnlever);
+        const lotQteDisponible = parseInt(lot.quantite_disponible, 10);
+        const quantitePriseDansCeLot = Math.min(lotQteDisponible, quantiteRestanteAEnlever);
         
-        // Mettre à jour le lot en diminuant sa quantité disponible
         await client.query(
           "UPDATE lots_stock SET quantite_disponible = quantite_disponible - $1 WHERE id_lot = $2",
           [quantitePriseDansCeLot, lot.id_lot]
         );
 
-        // Préparer les données pour l'insertion dans details_vente
+        // Calculs financiers pour la ligne de détail
+        const montantLigneBrut = quantitePriseDansCeLot * prixUnitaireBase;
+        const priseEnChargeLigne = montantLigneBrut * (tauxReduction / 100);
+        const montantLigneApresReduction = montantLigneBrut - priseEnChargeLigne;
+        const prixUnitaireVendu = prixUnitaireBase * (1 - tauxReduction / 100);
+
         detailsAInserer.push({
           id_produit,
           id_lot: lot.id_lot,
           quantite: quantitePriseDansCeLot,
-          prix_unitaire_vendu: prixVenteUnitaire
+          prix_unitaire_base: prixUnitaireBase,
+          prix_unitaire_vendu: prixUnitaireVendu,
+          taux_reduction: tauxReduction
         });
 
-        // Cumuler le prix total global de la vente
-        totalSommeVente += quantitePriseDansCeLot * prixVenteUnitaire;
+        // Cumulateurs globaux de la facture
+        totalSansReduction += montantLigneBrut;
+        totalPriseEnCharge += priseEnChargeLigne;
+        totalSommeVente += montantLigneApresReduction;
+
         quantiteRestanteAEnlever -= quantitePriseDansCeLot;
       }
     }
 
-    // 4. Insérer la Vente principale
+    // 4. Insérer la Vente principale 
     const textVente = `
-      INSERT INTO ventes (id_structure, id_utilisateur, total_somme, mode_paiement) 
-      VALUES ($1, $2, $3, $4) RETURNING *`;
+      INSERT INTO ventes (id_structure, id_utilisateur, total_somme, mode_paiement, total_sans_reduction, total_prise_en_charge) 
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`;
+    
     const venteRes = await client.query(textVente, [
       id_structure, 
       id_utilisateur || null, 
-      totalSommeVente, 
-      mode_paiement || "ESPECES"
+      Math.round(totalSommeVente), // Arrondi propre pour la monnaie (FCFA)
+      modePaiement || "ESPECES",
+      Math.round(totalSansReduction), 
+      Math.round(totalPriseEnCharge)
     ]);
     const nouvelleVente = venteRes.rows[0];
 
-    // 5. Insérer toutes les lignes de détails rattachées à cette vente (votre table details_vente)
+    // 5. Insérer les lignes de détails rattachées
     const textDetail = `
-      INSERT INTO details_vente (id_vente, id_produit, id_lot, quantite, prix_unitaire_vendu) 
-      VALUES ($1, $2, $3, $4, $5)`;
+      INSERT INTO details_vente (id_vente, id_produit, id_lot, quantite, prix_unitaire_base, prix_unitaire_vendu, taux_reduction) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7)`;
       
     for (const detail of detailsAInserer) {
       await client.query(textDetail, [
@@ -111,27 +130,34 @@ router.post("/", async (req, res) => {
         detail.id_produit, 
         detail.id_lot, 
         detail.quantite, 
-        detail.prix_unitaire_vendu
+        detail.prix_unitaire_base,
+        detail.prix_unitaire_vendu,
+        detail.taux_reduction
       ]);
     }
 
     await client.query("COMMIT");
-    notifyRefresh(req);
+    
+    // Notification WebSocket (Appel de votre fonction existante)
+    if (typeof notifyRefresh === 'function') {
+      notifyRefresh(req);
+    }
 
-    // Retourne le succès ainsi que l'ID généré pour ouvrir le ticket instantanément à l'écran
     res.status(201).json({ 
       success: true, 
       message: "Vente validée et stock mis à jour avec succès.", 
       id_vente: nouvelleVente.id_vente,
-      total: totalSommeVente,
+      total_somme: nouvelleVente.total_somme,
+      total_sans_reduction: nouvelleVente.total_sans_reduction,
+      total_prise_en_charge: nouvelleVente.total_prise_en_charge,
       mode_paiement: nouvelleVente.mode_paiement,
       date_vente: nouvelleVente.date_vente
     });
 
-  } catch (err) {
+  } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Erreur DB POST Vente:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("Erreur backend vente:", error);
+    res.status(500).json({ error: error.message });
   } finally {
     client.release();
   }
@@ -158,8 +184,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// --- 3. LIRE LES LIGNES DE DÉTAILS D'UNE VENTE SPECIFIQUE (GET DETAILS POUR FACTURE) ---
-// Cette route est appelée par `handleOuvrirFacture` dans votre interface React
+// --- 3. LIRE LES LIGNES DE DÉTAILS D'UNE VENTE SPECIFIQUE ---
 router.get("/details/:id_vente", async (req, res) => {
   const id_structure = req.headers["id_structure"] || req.query.id_structure;
   const { id_vente } = req.params;
@@ -169,7 +194,6 @@ router.get("/details/:id_vente", async (req, res) => {
   }
 
   try {
-    // Requête SQL avec jointure pour obtenir le nom du médicament et le lot sur le reçu
     const query = `
       SELECT 
         dv.id_detail_vente,
@@ -177,12 +201,12 @@ router.get("/details/:id_vente", async (req, res) => {
         dv.id_produit,
         dv.id_lot,
         dv.quantite,
+        dv.prix_unitaire_base,
         dv.prix_unitaire_vendu,
-        p.nom AS nom_produit,
-        l.id_lot
+        dv.taux_reduction,
+        p.nom AS nom_produit
       FROM details_vente dv
       JOIN produits p ON dv.id_produit = p.id_produit
-      LEFT JOIN lots_stock l ON dv.id_lot = l.id_lot
       JOIN ventes v ON dv.id_vente = v.id_vente
       WHERE dv.id_vente = $1 AND v.id_structure = $2`;
 
@@ -195,7 +219,6 @@ router.get("/details/:id_vente", async (req, res) => {
 });
 
 // --- 4. ANNULATION COMPLÈTE D'UNE VENTE (DELETE) ---
-// Restitue proprement les quantités vendues dans les lots d'origine (anti-gaspillage FEFO)
 router.delete("/annuler/:id", async (req, res) => {
   const id_structure = req.headers["id_structure"] || req.query.id_structure;
   const { id } = req.params;
@@ -206,7 +229,6 @@ router.delete("/annuler/:id", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Vérifier la cohérence de la vente
     const checkVente = await client.query(
       "SELECT id_vente FROM ventes WHERE id_vente = $1 AND id_structure = $2", 
       [id, id_structure]
@@ -217,7 +239,6 @@ router.delete("/annuler/:id", async (req, res) => {
       return res.status(404).json({ error: "Vente introuvable ou accès non autorisé." });
     }
 
-    // Récupérer les lignes de détails pour restaurer le stock initial
     const lignesRes = await client.query(
       "SELECT id_lot, quantite FROM details_vente WHERE id_vente = $1", 
       [id]
@@ -232,8 +253,6 @@ router.delete("/annuler/:id", async (req, res) => {
       }
     }
 
-    // Supprimer la vente principale. 
-    // Si votre clé étrangère possède un "ON DELETE CASCADE", les détails associés sauteront automatiquement.
     await client.query("DELETE FROM ventes WHERE id_vente = $1 AND id_structure = $2", [id, id_structure]);
 
     await client.query("COMMIT");
