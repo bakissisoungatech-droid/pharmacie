@@ -11,6 +11,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 function Dashboard() {
   const [stats, setStats] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [structureInfo, setStructureInfo] = useState(null); // État ajouté pour stocker l'en-tête officiel
 
   // --- ÉTAT POUR LA NAVIGATION PAR ONGLETS ---
   const [activeTab, setActiveTab] = useState("vue_generale"); // "vue_generale" ou "entrees_produits"
@@ -55,6 +56,43 @@ function Dashboard() {
     };
   }, [getStructureId, startDate, endDate]);
 
+  // 3. Configuration de la structure
+  const loadStructureConfig = useCallback(async () => {
+    const idLocalStorage = getStructureId();
+    if (!idLocalStorage) return;
+
+    try {
+      const r = await axios.get("http://192.168.100.34:3000/api/structure", getAxiosConfig());
+      
+      if (r.data && Array.isArray(r.data)) {
+        const structureTrouvee = r.data.find(
+          (str) => str.id_structure === idLocalStorage || str.id === idLocalStorage
+        );
+
+        if (structureTrouvee) {
+          const structureValidee = {
+            id_structure: structureTrouvee.id_structure,
+            nom: structureTrouvee.nom,
+            raison_sociale: structureTrouvee.raison_sociale,
+            adresse: structureTrouvee.adresse,
+            telephone: structureTrouvee.telephone,
+            logo: structureTrouvee.logo
+          };
+          setStructureInfo(structureValidee);
+          localStorage.setItem("structure", JSON.stringify(structureValidee));
+          localStorage.setItem("nom_structure", structureValidee.nom);
+        }
+      } else if (r.data && !Array.isArray(r.data)) {
+        if (r.data.id_structure === idLocalStorage || r.data.id === idLocalStorage) {
+          setStructureInfo(r.data);
+          localStorage.setItem("structure", JSON.stringify(r.data));
+        }
+      }
+    } catch (error) {
+      console.error("Erreur lors de la comparaison de la structure :", error);
+    }
+  }, [getStructureId, getAxiosConfig]);
+
   const loadStats = useCallback(async () => {
     const idStructure = getStructureId();
     if (!idStructure) return;
@@ -77,23 +115,27 @@ function Dashboard() {
     }
   }, [getStructureId, getAxiosConfig]);
 
+  // Initialisation des données
   useEffect(() => {
+    loadStructureConfig();
     loadStats();
     loadEntreesStock();
-  }, [loadStats, loadEntreesStock]);
+  }, [loadStructureConfig, loadStats, loadEntreesStock]);
 
+  // Écoute temps réel avec Socket.io
   useEffect(() => {
     const idStructure = getStructureId();
     if (!idStructure) return;
 
     const handleRefresh = () => {
+      loadStructureConfig();
       loadStats();
       loadEntreesStock();
     };
     socket.on("refresh_data", handleRefresh);
 
     return () => { socket.off("refresh_data", handleRefresh); };
-  }, [getStructureId, loadStats, loadEntreesStock]);
+  }, [getStructureId, loadStructureConfig, loadStats, loadEntreesStock]);
 
   // --- EXTRACTION DE LA LISTE DES ABONNÉS / TIERS ---
   const modesStandards = ["ESPECES", "MOBILE_MONEY", "CARTE", "CHEQUE"];
@@ -165,14 +207,6 @@ function Dashboard() {
     }, 0);
   }, [recouvrementFiltres]);
 
-  const entreesJournalieres = useMemo(() => {
-    const aujourdhui = new Date().toISOString().split('T')[0];
-    return entreesStock.filter(entry => {
-      const dateEntree = new Date(entry.date_entree).toISOString().split('T')[0];
-      return dateEntree === aujourdhui;
-    });
-  }, [entreesStock]);
-
   const handlePrintVentes = () => {
     window.print();
   };
@@ -222,7 +256,6 @@ function Dashboard() {
     );
   }
 
-  // --- RENDER DU COMPOSANT FILTRE FINANCIER (Déclaré en dehors du JSX principal) ---
   const renderFiltresModale = () => (
     <div className="d-flex align-items-center gap-2 flex-wrap mb-3 p-2 bg-light rounded border no-print">
       <span className="small fw-bold text-muted">Filtrer les résultats :</span>
@@ -248,22 +281,134 @@ function Dashboard() {
   return (
     <div className="container mt-4">
       <style>{`
+        /* --- STYLE POUR L'IMPRESSION --- */
         @media print {
-          body * { visibility: hidden; }
-          .print-section, .print-section * { visibility: visible; }
-          .print-section { position: absolute; left: 0; top: 0; width: 100%; }
-          .no-print { display: none !important; }
+          /* 1. On cache tout ce qui ne doit absolument pas être imprimé */
+          .no-print, .btn, .btn-close, select, input, .modal-footer, .nav-tabs { 
+            display: none !important; 
+          }
+          
+          /* 2. On réinitialise les conteneurs globaux */
+          body, .container, #root {
+            background: white !important;
+            color: black !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          /* 3. FORCE l'affichage de l'en-tête de la structure */
+          .print-header {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            width: 100% !important;
+            margin-bottom: 25px !important;
+            border-bottom: 2px solid #000 !important;
+          }
+          
+          .print-header * {
+            visibility: visible !important;
+          }
+
+          /* 4. Configuration des modales pour l'impression */
+          .modal {
+            position: absolute !important;
+            left: 0 !important;
+            top: 120px !important; /* Laisse de la place pour l'en-tête de la structure en haut */
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+            display: block !important;
+            background: none !important;
+          }
+          
+          .modal-dialog {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          
+          .modal-content {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+          }
+          
+          .modal-body {
+            max-height: none !important;
+            overflow-y: visible !important;
+            padding: 0 !important;
+          }
+          
+          .modal-header {
+            border-bottom: 2px solid #000 !important;
+            padding-bottom: 10px !important;
+            color: black !important;
+            background: transparent !important;
+          }
+
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+          }
+          th {
+            background-color: #f2f2f2 !important;
+            color: black !important;
+            border: 1px solid #ddd !important;
+          }
+          td {
+            border: 1px solid #ddd !important;
+          }
         }
-        .hover-shadow:hover { transform: translateY(-3px); transition: all 0.2s ease-in-out; box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
+        
+        /* --- STYLE ÉCRAN --- */
+        .print-header { display: none; }
+        .hover-shadow:hover { 
+          transform: translateY(-3px); 
+          transition: all 0.2s ease-in-out; 
+          box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; 
+        }
       `}</style>
 
-      {/* --- EN-TÊTE --- */}
+      {/* ================= EN-TÊTE OFFICIEL DE LA STRUCTURE POUR L'IMPRESSION ================= */}
+      {structureInfo && (
+        <div className="print-header text-dark border-bottom pb-3 mb-4">
+          <div className="d-flex align-items-center justify-content-between">
+            <div className="d-flex align-items-center">
+              {structureInfo.logo && (
+                <div className="me-3">
+                  <img 
+                    src={structureInfo.logo} 
+                    style={{ width: "80px", maxHeight: "80px", objectFit: "contain" }} 
+                    alt="Logo Structure" 
+                    onError={(e) => e.target.style.display = 'none'} 
+                  />
+                </div>
+              )}
+              <div>
+                <h4 className="fw-bold text-uppercase mb-1">{structureInfo.nom}</h4>
+                <p className="small text-muted mb-0">{structureInfo.adresse}</p>
+                <p className="small text-muted mb-0 fw-bold">Tél: {structureInfo.telephone}</p>
+              </div>
+            </div>
+            <div className="text-end small">
+              <span className="fw-bold text-uppercase bg-light p-1 border rounded">Rapport de Caisse</span><br />
+              <span className="text-muted d-block mt-2">Imprimé le : {new Date().toLocaleDateString("fr-FR")} à {new Date().toLocaleTimeString("fr-FR")}</span>
+              {startDate && endDate && (
+                <span className="badge bg-secondary mt-1">Période : {new Date(startDate).toLocaleDateString("fr-FR")} au {new Date(endDate).toLocaleDateString("fr-FR")}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- EN-TÊTE ÉCRAN --- */}
       <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 no-print">
         <div>
           <h3>Tableau de Bord Structure</h3>
-          {/* <span className="badge bg-secondary p-2">Rôle : {currentUser?.role || "Utilisateur"}</span> */}
         </div>
-
         <div className="card p-2 shadow-sm border-0 bg-light">
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <span className="small fw-bold text-muted">Période :</span>
@@ -306,29 +451,21 @@ function Dashboard() {
             <div className="col-md-4" style={{ cursor: 'pointer' }} onClick={() => { resetFiltresModale(); setShowVentesModal(true); }}>
               <div className="card shadow-sm border-0 bg-primary text-white p-3 h-100 hover-shadow">
                 <div className="small text-uppercase text-white-50 fw-bold">Chiffre d'Affaires Global</div>
-                <div className="fs-3 fw-bold my-2">
-                  {stats.indicateurs.ca_global?.toLocaleString()} <span className="fs-6">FCFA</span>
-                </div>
+                <div className="fs-3 fw-bold my-2">{stats.indicateurs.ca_global?.toLocaleString()} <span className="fs-6">FCFA</span></div>
                 <div className="small text-white-50">Activité réelle de la structure 🔍</div>
               </div>
             </div>
-
             <div className="col-md-4" style={{ cursor: 'pointer' }} onClick={() => { resetFiltresModale(); setShowRecettesModal(true); }}>
               <div className="card shadow-sm border-0 bg-success text-white p-3 h-100 hover-shadow">
                 <div className="small text-uppercase text-white-50 fw-bold">Recettes Directes En Caisse</div>
-                <div className="fs-3 fw-bold my-2">
-                  {stats.indicateurs?.ca_patient_recette?.toLocaleString('fr-FR')} <span className="fs-6">FCFA</span>
-                </div>
+                <div className="fs-3 fw-bold my-2">{stats.indicateurs?.ca_patient_recette?.toLocaleString('fr-FR')} <span className="fs-6">FCFA</span></div>
                 <div className="small text-white-50">Espèces / Mobile Money perçus 💵</div>
               </div>
             </div>
-
             <div className="col-md-4" style={{ cursor: 'pointer' }} onClick={() => { resetFiltresModale(); setShowRecouvrementModal(true); }}>
               <div className="card shadow-sm border-0 bg-warning text-dark p-3 h-100 hover-shadow">
                 <div className="small text-uppercase text-muted fw-bold">À Recouvrer (Tiers / Sociétés)</div>
-                <div className="fs-3 fw-bold my-2">
-                  {stats.indicateurs?.ca_prise_en_charge?.toLocaleString('fr-FR')} <span className="fs-6">FCFA</span>
-                </div>
+                <div className="fs-3 fw-bold my-2">{stats.indicateurs?.ca_prise_en_charge?.toLocaleString('fr-FR')} <span className="fs-6">FCFA</span></div>
                 <div className="small text-muted">Prises en charge à facturer 🏢</div>
               </div>
             </div>
@@ -343,7 +480,6 @@ function Dashboard() {
                 </div>
               </div>
             </div>
-
             <div className="col-md-5">
               <div className="card p-3 shadow-sm h-100">
                 <h5 className="card-title fw-bold text-secondary mb-3">🏆 Top 5 des Médicaments</h5>
@@ -360,14 +496,6 @@ function Dashboard() {
       {activeTab === "entrees_produits" && (
         <>
           <div className="row g-3 mb-4 no-print">
-            {/* <div className="col-md-4">
-              <div className="card shadow-sm border-0 bg-dark text-white p-3 h-100">
-                <div className="small text-uppercase text-white-50 fw-bold">💼 Réceptions du Jour</div>
-                <div className="display-6 fw-bold my-1 text-info">{entreesJournalieres.length}</div>
-                <div className="small text-white-50">Nouveaux lots enregistrés aujourd'hui 📅</div>
-              </div>
-            </div> */}
-
             <div className="col-md-4" style={{ cursor: 'pointer' }} onClick={() => setShowRuptureModal(true)}>
               <div className="card shadow-sm border-0 bg-danger text-white p-3 h-100 hover-shadow">
                 <div className="small text-uppercase text-white-50 fw-bold">⚠️ Ruptures Stock</div>
@@ -375,7 +503,6 @@ function Dashboard() {
                 <div className="small text-white-50">Médicaments épuisés à réapprovisionner 🔍</div>
               </div>
             </div>
-
             <div className="col-md-4" style={{ cursor: 'pointer' }} onClick={() => setShowCritiqueModal(true)}>
               <div className="card shadow-sm border-0 bg-secondary text-white p-3 h-100 hover-shadow">
                 <div className="small text-uppercase text-white-50 fw-bold">⏳ Lots Critiques</div>
@@ -386,20 +513,19 @@ function Dashboard() {
           </div>
 
           <div className="card p-4 shadow-sm border-0 mb-5">
-            <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+            <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3 no-print">
               <h5 className="fw-bold text-secondary m-0">📋 Historique des Entrées &amp; Réceptions de Médicaments</h5>
               <span className="badge bg-dark p-2 fs-6">{entreesStock.length} lots au total</span>
             </div>
-
             <div className="table-responsive">
               <table className="table table-striped table-hover align-middle border">
                 <thead className="table-dark">
                   <tr>
                     <th>Date &amp; Heure d'Entrée</th>
                     <th>Nom du Médicament</th>
-                    <th>Numéro de Lot Généré</th>
-                    <th className="text-center">Quantité Initialement Reçue</th>
-                    <th>Date de Péremption fixée</th>
+                    <th>Numéro de Lot</th>
+                    <th className="text-center">Quantité</th>
+                    <th>Date de Péremption</th>
                     <th className="text-end">Valeur Estimée Public</th>
                   </tr>
                 </thead>
@@ -411,24 +537,14 @@ function Dashboard() {
                         <td className="fw-bold text-primary">{entry.nom_produit}</td>
                         <td><code>{entry.id_lot?.substring(0, 18)}...</code></td>
                         <td className="text-center">
-                          <span className="badge bg-success px-3 py-2 fs-6 rounded-pill">
-                            +{entry.quantite_disponible} units
-                          </span>
+                          <span className="badge bg-success px-3 py-2 fs-6 rounded-pill">+{entry.quantite_disponible} units</span>
                         </td>
-                        <td className="fw-bold text-secondary">
-                          {new Date(entry.date_peremption).toLocaleDateString("fr-FR")}
-                        </td>
-                        <td className="text-end fw-bold text-dark">
-                          {(parseFloat(entry.prix_vente_unitaire || 0) * entry.quantite_disponible).toLocaleString()} FCFA
-                        </td>
+                        <td className="fw-bold text-secondary">{new Date(entry.date_peremption).toLocaleDateString("fr-FR")}</td>
+                        <td className="text-end fw-bold text-dark">{(parseFloat(entry.prix_vente_unitaire || 0) * entry.quantite_disponible).toLocaleString()} FCFA</td>
                       </tr>
                     ))
                   ) : (
-                    <tr>
-                      <td colSpan="6" className="text-center py-4 text-muted">
-                        Aucune entrée de produit enregistrée. 📦
-                      </td>
-                    </tr>
+                    <tr><td colSpan="6" className="text-center py-4 text-muted">Aucune entrée de produit enregistrée. 📦</td></tr>
                   )}
                 </tbody>
               </table>
@@ -443,11 +559,11 @@ function Dashboard() {
           <div className="modal-dialog modal-xl modal-dialog-centered print-section">
             <div className="modal-content border-0 shadow">
               <div className="modal-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h5 className="modal-title fw-bold mb-0">📋 Journal de Ventes (Vue Globale)</h5>
+                <h5 className="modal-title fw-bold mb-0 mt-5 text-decoration-none">📋 Journal de Ventes (Vue Globale)</h5>
                 <button type="button" className="btn-close btn-close-white no-print" onClick={() => setShowVentesModal(false)}></button>
               </div>
-              <div className="modal-body" style={{ maxHeight: '450px', overflowY: 'auto' }}>
-                {renderFiltresModale()}
+              <div className="modal-body">
+                <div className="no-print">{renderFiltresModale()}</div>
                 {ventesGlobalesFiltrees.length > 0 ? (
                   <>
                     <table className="table table-striped table-hover align-middle small">
@@ -486,9 +602,7 @@ function Dashboard() {
                       </tbody>
                     </table>
                     <div className="d-flex justify-content-end align-items-center mt-3 p-3 bg-light rounded border">
-                      <h5 className="fw-bold mb-0 text-dark">
-                        TOTAL RECALCULÉ : <span className="text-primary">{totalVentesGlobales.toLocaleString()} FCFA</span>
-                      </h5>
+                      <h5 className="fw-bold mb-0 text-dark">TOTAL RECALCULÉ : <span className="text-primary">{totalVentesGlobales.toLocaleString()} FCFA</span></h5>
                     </div>
                   </>
                 ) : (
@@ -510,11 +624,11 @@ function Dashboard() {
           <div className="modal-dialog modal-xl modal-dialog-centered print-section">
             <div className="modal-content border-0 shadow">
               <div className="modal-header bg-success text-white d-flex justify-content-between align-items-center">
-                <h5 className="modal-title fw-bold mb-0">💵 Journal des Recettes Directes</h5>
+                <h5 className="modal-title fw-bold mb-0 mt-5">💵 Journal des Recettes Directes</h5>
                 <button type="button" className="btn-close btn-close-white no-print" onClick={() => setShowRecettesModal(false)}></button>
               </div>
-              <div className="modal-body" style={{ maxHeight: '450px', overflowY: 'auto' }}>
-                {renderFiltresModale()}
+              <div className="modal-body">
+                <div className="no-print">{renderFiltresModale()}</div>
                 {recettesDirectesFiltrees.length > 0 ? (
                   <>
                     <table className="table table-striped table-hover align-middle small">
@@ -544,9 +658,7 @@ function Dashboard() {
                       </tbody>
                     </table>
                     <div className="d-flex justify-content-end align-items-center mt-3 p-3 bg-light rounded border">
-                      <h5 className="fw-bold mb-0 text-dark">
-                        TOTAL EN CAISSE FILTRÉ : <span className="text-success">{totalRecettesDirectes.toLocaleString()} FCFA</span>
-                      </h5>
+                      <h5 className="fw-bold mb-0 text-dark">TOTAL EN CAISSE FILTRÉ : <span className="text-success">{totalRecettesDirectes.toLocaleString()} FCFA</span></h5>
                     </div>
                   </>
                 ) : (
@@ -568,11 +680,11 @@ function Dashboard() {
           <div className="modal-dialog modal-xl modal-dialog-centered print-section">
             <div className="modal-content border-0 shadow">
               <div className="modal-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                <h5 className="modal-title fw-bold mb-0">🏢 Dossiers Prises en Charge Sociétés &amp; Assurances</h5>
+                <h5 className="modal-title fw-bold mb-0 mt-5">🏢 Dossiers Prises en Charge Sociétés &amp; Assurances</h5>
                 <button type="button" className="btn-close no-print" onClick={() => setShowRecouvrementModal(false)}></button>
               </div>
-              <div className="modal-body" style={{ maxHeight: '450px', overflowY: 'auto' }}>
-                {renderFiltresModale()}
+              <div className="modal-body">
+                <div className="no-print">{renderFiltresModale()}</div>
                 {recouvrementFiltres.length > 0 ? (
                   <>
                     <table className="table table-striped table-hover align-middle small">
@@ -583,6 +695,7 @@ function Dashboard() {
                           <th className="text-center">Qté</th>
                           <th className="text-end">Total Brut (Public)</th>
                           <th className="text-end">Part Patient</th>
+                          <th className="text-center">Taux</th>
                           <th className="text-end">Part Tiers (À Recouvrer)</th>
                           <th>Société / Assurance</th>
                         </tr>
@@ -592,6 +705,10 @@ function Dashboard() {
                           const totalBrut = parseFloat(v.total_brut_article || (v.quantite * (v.prix_unitaire_base || v.prix_unitaire_vendu)));
                           const partPatient = parseFloat(v.total_net_patient || 0);
                           const partTiers = totalBrut - partPatient;
+                          
+                          // Calcul dynamique du taux de prise en charge (ex: 70%, 80%)
+                          const tauxTiers = totalBrut > 0 ? Math.round((partTiers / totalBrut) * 100) : 0;
+
                           return (
                             <tr key={index}>
                               <td>{new Date(v.date_vente).toLocaleString("fr-FR")}</td>
@@ -599,6 +716,11 @@ function Dashboard() {
                               <td className="text-center fw-bold">{v.quantite}</td>
                               <td className="text-end text-muted">{totalBrut.toLocaleString()} F</td>
                               <td className="text-end text-danger">{partPatient.toLocaleString()} F</td>
+                              <td className="text-center">
+                                <span className="badge bg-info text-dark fw-bold">
+                                  {tauxTiers}%
+                                </span>
+                              </td>
                               <td className="text-end fw-bold text-primary">{partTiers.toLocaleString()} FCFA</td>
                               <td><span className="badge bg-warning text-dark border fw-bold">🏢 {v.mode_paiement}</span></td>
                             </tr>
@@ -607,9 +729,7 @@ function Dashboard() {
                       </tbody>
                     </table>
                     <div className="d-flex justify-content-end align-items-center mt-3 p-3 bg-light rounded border">
-                      <h5 className="fw-bold mb-0 text-dark">
-                        TOTAL HORS PART PATIENT : <span className="text-primary">{totalRecouvrementTiers.toLocaleString()} FCFA</span>
-                      </h5>
+                      <h5 className="fw-bold mb-0 text-dark">TOTAL HORS PART PATIENT : <span className="text-primary">{totalRecouvrementTiers.toLocaleString()} FCFA</span></h5>
                     </div>
                   </>
                 ) : (
@@ -632,9 +752,9 @@ function Dashboard() {
             <div className="modal-content border-0 shadow">
               <div className="modal-header bg-danger text-white">
                 <h5 className="modal-title fw-bold">⚠️ Produits en rupture de stock</h5>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowRuptureModal(false)}></button>
+                <button type="button" className="btn-close btn-close-white no-print" onClick={() => setShowRuptureModal(false)}></button>
               </div>
-              <div className="modal-body" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <div className="modal-body">
                 {stats.liste_ruptures && stats.liste_ruptures.length > 0 ? (
                   <table className="table table-hover align-middle">
                     <thead className="table-light">
@@ -650,7 +770,7 @@ function Dashboard() {
                   <p className="text-center my-3 text-muted">Aucun produit en rupture complète ! 🎉</p>
                 )}
               </div>
-              <div className="modal-footer bg-light">
+              <div className="modal-footer bg-light no-print">
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowRuptureModal(false)}>Fermer</button>
               </div>
             </div>
@@ -665,37 +785,56 @@ function Dashboard() {
             <div className="modal-content border-0 shadow">
               <div className="modal-header bg-dark text-white">
                 <h5 className="modal-title fw-bold text-warning">⏳ Alertes de Péremption &amp; Lots Critiques</h5>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowCritiqueModal(false)}></button>
+                <button type="button" className="btn-close btn-close-white no-print" onClick={() => setShowCritiqueModal(false)}></button>
               </div>
-              <div className="modal-body" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <div className="modal-body">
                 {stats.indicateurs?.lots_critiques > 0 && stats.liste_critiques?.length > 0 ? (
                   <table className="table table-hover align-middle">
                     <thead className="table-light">
                       <tr>
                         <th>Médicament</th>
                         <th>Identifiant Lot</th>
-                        <th className="text-end">Quantité Restante</th>
+                        <th className="text-left">Quantité Restante</th>
                         <th>Date Péremption</th>
                         <th>statut</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.liste_critiques.map((lot, index) => (
-                        <tr key={index}>
-                          <td className="fw-bold">{lot.nom_produit}</td>
-                          <td><code>{lot.id_lot}</code></td>
-                          <td className="text-end fw-bold text-danger">{lot.quantite_disponible}</td>
-                          <td>{new Date(lot.date_peremption).toLocaleDateString("fr-FR")}</td>
-                          <td className="text-end fw-bold text-danger">{lot.statut}</td>
-                        </tr>
-                      ))}
+                      {stats.liste_critiques.map((lot, index) => { 
+                        // Sécurité : Si lot.jours_restants n'existe pas, on calcule la différence par rapport à la date du jour
+                        let jours = parseInt(lot.jours_restants, 10);
+                        
+                        if (isNaN(jours)) {
+                          const datePeremption = new Date(lot.date_peremption);
+                          const aujourdhui = new Date();
+                          // Calcul de la différence en jours
+                          const differenceTemps = datePeremption.getTime() - aujourdhui.getTime();
+                          jours = Math.ceil(differenceTemps / (1000 * 60 * 60 * 24));
+                        }
+
+                        const estPerime = jours <= 0;
+
+                        return ( 
+                          <tr key={index}>
+                            <td className="fw-bold">{lot.nom_produit}</td>
+                            <td><code>{lot.id_lot}</code></td>
+                            <td className="text-left fw-bold text-danger">{lot.quantite_disponible}</td>
+                            <td>{new Date(lot.date_peremption).toLocaleDateString("fr-FR")}</td>
+                            <td>
+                              <span className={`badge ${estPerime ? "bg-danger" : "bg-dark"}`}>
+                                {estPerime ? "PÉRIMÉ" : `${jours} jours restants`}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 ) : (
                   <p className="text-center my-3 text-muted">Aucun lot critique. 👍</p>
                 )}
               </div>
-              <div className="modal-footer bg-light">
+              <div className="modal-footer bg-light no-print">
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCritiqueModal(false)}>Fermer</button>
               </div>
             </div>

@@ -10,6 +10,7 @@ const notifyRefresh = (req) => {
 // --- 1. CRÉATION D'UNE VENTE (POST) ---
 router.post("/", async (req, res) => {
   const id_structure = req.body.id_structure || req.headers["id_structure"];
+  // Récupération de mode_paiement (snake_case)
   const { id_utilisateur, mode_paiement, articles, taux_reduction: reductionGlobale } = req.body;
 
   if (!id_structure) {
@@ -19,8 +20,8 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Aucun article sélectionné pour la vente." });
   }
 
-  // Détermination sécurisée du taux de réduction applicable reçu du client (ex: 12.5)
-  const tauxReduction = Math.max(0, Math.min(100, parseFloat(reductionGlobale) || 0.00));
+  // Taux commun modifiable reçu de l'interface (ex: 70)
+  const tauxReductionGlobal = Math.max(0, Math.min(100, parseFloat(reductionGlobale) || 0.00));
 
   const client = await pool.connect();
   try {
@@ -33,12 +34,18 @@ router.post("/", async (req, res) => {
     const detailsAInserer = [];
 
     for (const article of articles) {
-      const { id_produit, quantite: quantiteDemandee } = article;
+      const { id_produit, quantite: quantiteDemandee, taux_reduction: tauxArticle } = article;
       let quantiteRestanteAEnlever = parseInt(quantiteDemandee, 10);
 
       if (isNaN(quantiteRestanteAEnlever) || quantiteRestanteAEnlever <= 0) {
         throw new Error(`Quantité invalide reçue pour le produit.`);
       }
+
+      // Priorité 1 : Le taux propre à l'abonnement de la personne transmis via l'article
+      // Priorité 2 : Le taux commun modifiable global
+      const tauxReduction = tauxArticle !== undefined && tauxArticle !== null
+        ? Math.max(0, Math.min(100, parseFloat(tauxArticle) || 0.00))
+        : tauxReductionGlobal;
 
       // 1. Récupérer le prix de vente public d'origine
       const prodRes = await client.query(
@@ -53,7 +60,7 @@ router.post("/", async (req, res) => {
       const prixUnitaireBase = parseFloat(prodRes.rows[0].prix_vente_unitaire);
       const nomProduit = prodRes.rows[0].nom;
 
-      // 2. Récupérer les lots par FEFO (Premier expiré, premier sorti)
+      // 2. Récupérer les lots par FEFO
       const lotsRes = await client.query(
         `SELECT id_lot, quantite_disponible 
          FROM lots_stock 
@@ -80,7 +87,7 @@ router.post("/", async (req, res) => {
           [quantitePriseDansCeLot, lot.id_lot]
         );
 
-        // Calculs financiers pour la ligne de détail
+        // Calculs financiers basés sur le taux affecté
         const montantLigneBrut = quantitePriseDansCeLot * prixUnitaireBase;
         const priseEnChargeLigne = montantLigneBrut * (tauxReduction / 100);
         const montantLigneApresReduction = montantLigneBrut - priseEnChargeLigne;
@@ -104,7 +111,7 @@ router.post("/", async (req, res) => {
       }
     }
 
-    // 4. Insérer la Vente principale 
+    // 4. Insérer la Vente principale
     const textVente = `
       INSERT INTO ventes (id_structure, id_utilisateur, total_somme, mode_paiement, total_sans_reduction, total_prise_en_charge) 
       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`;
@@ -112,8 +119,8 @@ router.post("/", async (req, res) => {
     const venteRes = await client.query(textVente, [
       id_structure, 
       id_utilisateur || null, 
-      Math.round(totalSommeVente), // Arrondi propre pour la monnaie (FCFA)
-      modePaiement || "ESPECES",
+      Math.round(totalSommeVente), 
+      mode_paiement || "ESPECES", // Correction de la variable ici
       Math.round(totalSansReduction), 
       Math.round(totalPriseEnCharge)
     ]);
@@ -138,7 +145,6 @@ router.post("/", async (req, res) => {
 
     await client.query("COMMIT");
     
-    // Notification WebSocket (Appel de votre fonction existante)
     if (typeof notifyRefresh === 'function') {
       notifyRefresh(req);
     }
