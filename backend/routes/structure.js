@@ -9,7 +9,7 @@ const notifyRefresh = (req) => {
 
 // --- 1. CRÉER UNE NOUVELLE STRUCTURE ---
 router.post("/post", async (req, res) => {
-  const { nom, raison_sociale, adresse, telephone, mdp, logo, date_expiration } = req.body;
+  const { nom, raison_sociale, adresse, telephone, mdp, logo, date_expiration, pays, ville } = req.body;
 
   if (!nom || !raison_sociale || !mdp) {
     return res.status(400).json({ error: "Le nom, la raison sociale et le mot de passe sont requis." });
@@ -39,12 +39,12 @@ router.post("/post", async (req, res) => {
       dateExp = d.toISOString();
     }
 
-    // 3. Insertion de la structure
+    // 3. Insertion de la structure (avec pays et ville)
     const structureResult = await client.query(
-      `INSERT INTO structures (nom, raison_sociale, adresse, telephone, mdp, logo, date_expiration, actif) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, true) 
-       RETURNING id_structure, nom, raison_sociale, adresse, telephone, logo, date_expiration, actif, created_at`,
-      [nom, raison_sociale, adresse, telephone, mdpStructureHache, logo || null, dateExp]
+      `INSERT INTO structures (nom, raison_sociale, adresse, telephone, mdp, logo, date_expiration, actif, pays, ville) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9) 
+       RETURNING id_structure, nom, raison_sociale, adresse, telephone, logo, date_expiration, actif, created_at, pays, ville`,
+      [nom, raison_sociale, adresse, telephone, mdpStructureHache, logo || null, dateExp, pays || null, ville || null]
     );
 
     const nouvelleStructure = structureResult.rows[0];
@@ -83,7 +83,7 @@ router.post("/post", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT id_structure, nom, raison_sociale, adresse, telephone, mdp, logo, date_expiration, actif, created_at FROM structures ORDER BY created_at DESC"
+      "SELECT id_structure, nom, raison_sociale, adresse, telephone, mdp, logo, date_expiration, actif, created_at, pays, ville FROM structures ORDER BY created_at DESC"
     );
     res.json(r.rows);
   } catch (err) {
@@ -95,7 +95,7 @@ router.get("/", async (req, res) => {
 // --- 3. MODIFIER UNE STRUCTURE ---
 router.put("/:id", async (req, res) => {
   const { id } = req.params; // C'est l'id_structure
-  const { nom, raison_sociale, adresse, telephone, mdp, logo, date_expiration, actif } = req.body;
+  const { nom, raison_sociale, adresse, telephone, mdp, logo, date_expiration, actif, pays, ville } = req.body;
 
   // On commence une connexion au pool pour gérer la transaction
   const client = await pool.connect();
@@ -117,16 +117,15 @@ router.put("/:id", async (req, res) => {
       const selProprio = await bcrypt.genSalt(10);
       const mdpProprioHache = await bcrypt.hash(mdpProprioBrut, selProprio);
 
-      // 1. Mise à jour de la structure avec le mot de passe
+      // 1. Mise à jour de la structure avec le mot de passe, le pays et la ville
       result = await client.query(
         `UPDATE structures 
-         SET nom = $1, raison_sociale = $2, adresse = $3, telephone = $4, mdp = $5, logo = $6, date_expiration = $7, actif = $8 
-         WHERE id_structure = $9 RETURNING *`,
-        [nom, raison_sociale, adresse, telephone, mdpStructureHache, logo, date_expiration, actif, id]
+         SET nom = $1, raison_sociale = $2, adresse = $3, telephone = $4, mdp = $5, logo = $6, date_expiration = $7, actif = $8, pays = $9, ville = $10 
+         WHERE id_structure = $11 RETURNING *`,
+        [nom, raison_sociale, adresse, telephone, mdpStructureHache, logo, date_expiration, actif, pays || null, ville || null, id]
       );
 
       // 2. Mise à jour automatique du compte "proprio" lié à cette structure
-      // Le filtre s'assure qu'on vise le rôle proprio de cette structure exacte
       await client.query(
         `UPDATE utilisateurs 
          SET mot_de_passe = $1 
@@ -138,9 +137,9 @@ router.put("/:id", async (req, res) => {
       // Cas 2 : Le mot de passe reste inchangé, on met à jour uniquement les autres champs
       result = await client.query(
         `UPDATE structures 
-         SET nom = $1, raison_sociale = $2, adresse = $3, telephone = $4, logo = $5, date_expiration = $6, actif = $7 
-         WHERE id_structure = $8 RETURNING *`,
-        [nom, raison_sociale, adresse, telephone, logo, date_expiration, actif, id]
+         SET nom = $1, raison_sociale = $2, adresse = $3, telephone = $4, logo = $5, date_expiration = $6, actif = $7, pays = $8, ville = $9 
+         WHERE id_structure = $10 RETURNING *`,
+        [nom, raison_sociale, adresse, telephone, logo, date_expiration, actif, pays || null, ville || null, id]
       );
     }
 

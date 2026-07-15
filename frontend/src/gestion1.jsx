@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import logo from "/bakissi.png"
 
 // --- IMPORTS DES COMPOSANTS PHARMACIE ---
 import Dashboard from "./pages/dashboard"; 
@@ -102,8 +103,8 @@ function GestionPharmacie() {
       >
         {/* Marge de courtoisie pour éviter que le bouton 'Changer/Fermer' ne chevauche le titre BAKISSI sur mobile */}
         <div className="d-md-none" style={{ height: "45px" }}></div>
-
-        <h4 className="text-center mb-4 fw-bold text-success border-bottom pb-3">BAKISSI</h4>
+        <a href={logo} target="_blank" rel="noopener noreferrer"><img src={logo}  alt="" style={{width: "25vh"}}/></a>
+        {/* <h4 className="text-center mb-4 fw-bold text-success border-bottom pb-3">BAKISSI</h4> */}
 
         <div className="mb-3 text-center">
           <span className="badge bg-secondary p-2">Rôle : {userRole.toUpperCase()}</span>

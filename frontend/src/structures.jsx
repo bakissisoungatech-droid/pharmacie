@@ -56,6 +56,10 @@ function GestionStructures() {
   const [actif, setActif] = useState(true);
   const [editId, setEditId] = useState(null);
 
+  // NOUVEAUX ÉTATS POUR LES COLONNES AJOUTÉES
+  const [pays, setPays] = useState("");
+  const [ville, setVille] = useState("");
+
   // Authentification de terminal
   const [loginNom, setLoginNom] = useState("");
   const [loginMdp, setLoginMdp] = useState("");
@@ -109,7 +113,9 @@ function GestionStructures() {
       mdp,
       logo, // Envoyé sous forme de chaîne de caractères
       date_expiration: dateExpiration || null,
-      actif
+      actif,
+      pays: pays || null, // NOUVEAU
+      ville: ville || null  // NOUVEAU
     };
 
     try {
@@ -142,6 +148,8 @@ function GestionStructures() {
     setLogo("");
     setDateExpiration("");
     setActif(true);
+    setPays(""); // NOUVEAU
+    setVille(""); // NOUVEAU
     setEditId(null);
     const fileInput = document.getElementById("logoInput");
     if (fileInput) fileInput.value = "";
@@ -179,6 +187,8 @@ function GestionStructures() {
     setLogo(s.logo || ""); // Si s.logo est null, l'état devient "" au lieu de rompre le contrôle
     setDateExpiration(s.date_expiration ? s.date_expiration.substring(0, 16) : ""); 
     setActif(s.actif ?? true);
+    setPays(s.pays || ""); // NOUVEAU
+    setVille(s.ville || ""); // NOUVEAU
     setMdp(""); 
     setEditId(s.id_structure);
   };
@@ -246,7 +256,7 @@ function GestionStructures() {
                   </div>
                 </div>
                 
-                {/* INPUT MODIFIÉ POUR ACCEPTER LES FICHIERS IMAGE */}
+                {/* INPUT POUR LE LOGO */}
                 <div className="mb-2">
                   <label className="form-label small mb-1">Logo de l'Établissement</label>
                   <input 
@@ -265,6 +275,30 @@ function GestionStructures() {
                   )}
                 </div>
 
+                {/* SÉLECTEUR GÉOGRAPHIQUE : PAYS & VILLE */}
+                <div className="row">
+                  <div className="col-6 mb-2">
+                    <label className="form-label small mb-1">Pays</label>
+                    <input 
+                      type="text" 
+                      className="form-control form-control-sm" 
+                      placeholder="ex: Congo, France..." 
+                      value={pays} 
+                      onChange={(e) => setPays(e.target.value)} 
+                    />
+                  </div>
+                  <div className="col-6 mb-2">
+                    <label className="form-label small mb-1">Ville</label>
+                    <input 
+                      type="text" 
+                      className="form-control form-control-sm" 
+                      placeholder="ex: Pointe-Noire, Paris..." 
+                      value={ville} 
+                      onChange={(e) => setVille(e.target.value)} 
+                    />
+                  </div>
+                </div>
+
                 <div className="row">
                   <div className="col-6 mb-2">
                     <label className="form-label small mb-1">Téléphone</label>
@@ -275,10 +309,12 @@ function GestionStructures() {
                     <input type="datetime-local" className="form-control form-control-sm" value={dateExpiration} onChange={(e) => setDateExpiration(e.target.value)} />
                   </div>
                 </div>
+
                 <div className="mb-2">
-                    <label className="form-label small mb-1">Adresse Géographique</label>
-                    <input type="text" className="form-control form-control-sm" value={adresse || ""} onChange={(e) => setAdresse(e.target.value)} />
-                    </div>
+                  <label className="form-label small mb-1">Adresse Géographique</label>
+                  <input type="text" className="form-control form-control-sm" value={adresse || ""} onChange={(e) => setAdresse(e.target.value)} />
+                </div>
+
                 <div className="mb-3">
                   <label className="form-label small mb-1">Clé d'accès (Password)</label>
                   <input type="password" className="form-control form-control-sm" value={mdp} onChange={(e) => setMdp(e.target.value)} placeholder={editId ? "Inchangé si vide" : ""} />
@@ -315,6 +351,7 @@ function GestionStructures() {
                     <tr>
                       <th>Logo</th>
                       <th>Structure</th>
+                      <th>Localisation</th> {/* NOUVEAU TITRE DE COLONNE */}
                       <th>Abonnement / Validité</th>
                       <th>Visibilité / Statut</th>
                       <th className="text-end">Actions</th>
@@ -324,7 +361,6 @@ function GestionStructures() {
                     {data.map((s) => (
                       <tr key={s.id_structure} className={!s.actif ? "table-light text-muted" : ""}>
                         <td>
-                          {/* L'IMPRESSION LIT DIRECTEMENT LA CHAÎNE BASE64 ASSIGNÉE À L'ATTRIBUT SRC */}
                           {s.logo ? (
                             <img src={s.logo} alt="Logo" className="rounded border" style={{ width: "40px", height: "40px", objectFit: "cover" }} />
                           ) : (
@@ -335,6 +371,21 @@ function GestionStructures() {
                           <div className="fw-bold">{s.nom}</div>
                           <span className="text-muted text-uppercase" style={{ fontSize: "0.75rem" }}>{s.raison_sociale}</span>
                           <div className="text-muted" style={{ fontSize: "0.75rem" }}>{s.telephone || "Pas de numéro"}</div>
+                        </td>
+                        {/* NOUVELLE CELLULE : LOCALISATION (PAYS / VILLE ET ADRESSE) */}
+                        <td>
+                          {s.ville || s.pays ? (
+                            <div className="fw-bold text-dark">
+                              {s.ville && <span>{s.ville}</span>}
+                              {s.ville && s.pays && <span>, </span>}
+                              {s.pays && <span className="text-secondary">{s.pays}</span>}
+                            </div>
+                          ) : (
+                            <div className="text-muted italic">Non renseigné</div>
+                          )}
+                          <div className="text-muted text-truncate" style={{ fontSize: "0.75rem", maxWidth: "150px" }} title={s.adresse}>
+                            {s.adresse || "Pas d'adresse"}
+                          </div>
                         </td>
                         <td>
                           <CompteARebours dateExpiration={s.date_expiration} />

@@ -27,6 +27,7 @@ app.use("/api/structure", require("./routes/structure"));
 app.use("/api/utilisateur", require("./routes/utilisateur"));
 app.use("/api/abonnement", require("./routes/abonnement"));
 app.use("/api/vente", require("./routes/vente"));
+app.use("/api/recherche", require("./routes/recherche"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 
 server.listen(3000, () => console.log("Serveur lancé"));
