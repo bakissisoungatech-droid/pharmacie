@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import 'bootstrap/dist/css/bootstrap.min.css';
-import Login from "./Login"; 
+import Login from "./login"; 
 
 function AuthentificationUnique() {
     // État pour savoir quel formulaire afficher
