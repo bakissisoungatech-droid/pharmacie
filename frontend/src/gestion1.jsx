@@ -3,7 +3,7 @@ import logo from "/bakissi.png"
 
 // --- IMPORTS DES COMPOSANTS PHARMACIE ---
 import Dashboard from "./pages/dashboard"; 
-import ProduitsEtStock from "./pages/Produits"; 
+import ProduitsEtStock from "./pages/produits"; 
 import Caisse from "./pages/caisse"; 
 import LotsStock from "./pages/lotStock"; 
 
