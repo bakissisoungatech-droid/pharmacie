@@ -19,7 +19,7 @@ function Inscription() {
         if (!structureId) return;
 
         try {
-            const response = await axios.get(`http://192.168.100.34:3000/api/utilisateur`, {
+            const response = await axios.get(`https://pharmacie-production-9a16.up.railway.app/api/utilisateur`, {
                 headers: { "x-structure-id": structureId }
             });
             setData(response.data);
@@ -56,12 +56,12 @@ function Inscription() {
 
         try {
             if (editId) {
-                await axios.put(`http://192.168.100.34:3000/api/utilisateur/${editId}`, formData, {
+                await axios.put(`https://pharmacie-production-9a16.up.railway.app/api/utilisateur/${editId}`, formData, {
                     headers: { "x-structure-id": structureId }
                 });
                 alert("Utilisateur modifié !");
             } else {
-                await axios.post(`http://192.168.100.34:3000/api/utilisateur/post`, formData, {
+                await axios.post(`https://pharmacie-production-9a16.up.railway.app/api/utilisateur/post`, formData, {
                     headers: { "x-structure-id": structureId }
                 });
                 alert("Utilisateur créé !");
@@ -83,7 +83,7 @@ function Inscription() {
         const structureId = localStorage.getItem("id_structure");
         if (window.confirm("Voulez-vous vraiment supprimer cet utilisateur ?")) {
             try {
-                await axios.delete(`http://192.168.100.34:3000/api/utilisateur/${id_utilisateur}`, {
+                await axios.delete(`https://pharmacie-production-9a16.up.railway.app/api/utilisateur/${id_utilisateur}`, {
                     headers: { "x-structure-id": structureId }
                 });
                 loadData();

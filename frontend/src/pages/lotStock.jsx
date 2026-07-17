@@ -43,11 +43,11 @@ function LotsStock() {
 
     try {
       // 1. Charger les produits pour le sélecteur du formulaire
-      const resProd = await axios.get("http://192.168.100.34:3000/api/produit", getAxiosConfig());
+      const resProd = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/produit", getAxiosConfig());
       setProduits(resProd.data);
 
       // 2. Charger les alertes de péremption (lots à -90 jours ou périmés)
-      const resAlertes = await axios.get("http://192.168.100.34:3000/api/lots/alertes-peremption", getAxiosConfig());
+      const resAlertes = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/lots/alertes-peremption", getAxiosConfig());
       setAlertesPeremption(resAlertes.data);
     } catch (error) {
       console.error("Erreur lors du chargement des données de stock", error);
@@ -87,7 +87,7 @@ function LotsStock() {
     };
 
     try {
-      await axios.post("http://192.168.100.34:3000/api/lots", payload, getAxiosConfig());
+      await axios.post("https://pharmacie-production-9a16.up.railway.app/api/lots", payload, getAxiosConfig());
       alert("Nouvel arrivage enregistré et stock mis à jour !");
       
       // Réinitialisation du formulaire
@@ -109,7 +109,7 @@ function LotsStock() {
 
     try {
       await axios.post(
-        `http://192.168.100.34:3000/api/lots/retrait-perime/${id_lot}`,
+        `https://pharmacie-production-9a16.up.railway.app/api/lots/retrait-perime/${id_lot}`,
         {
           id_utilisateur: currentUser?.id_utilisateur,
           motif: "Retrait manuel via l'interface des périssables"

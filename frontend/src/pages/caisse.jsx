@@ -76,7 +76,7 @@ function Caisse() {
     if (!idLocalStorage) return;
 
     try {
-      const r = await axios.get("http://192.168.100.34:3000/api/structure", getAxiosConfig());
+      const r = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/structure", getAxiosConfig());
       
       if (r.data && Array.isArray(r.data)) {
         const structureTrouvee = r.data.find(
@@ -111,7 +111,7 @@ function Caisse() {
     const idStructure = getStructureId();
     if (!idStructure) return;
     try {
-      const r = await axios.get("http://192.168.100.34:3000/api/produit", getAxiosConfig());
+      const r = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/produit", getAxiosConfig());
       setProduits(r.data);
     } catch (error) {
       console.error("Erreur chargement produits caisse", error);
@@ -122,7 +122,7 @@ function Caisse() {
     const idStructure = getStructureId();
     if (!idStructure) return;
     try {
-      const r = await axios.get("http://192.168.100.34:3000/api/vente", getAxiosConfig());
+      const r = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/vente", getAxiosConfig());
       setVentesRecentes(r.data);
     } catch (error) {
       console.error("Erreur chargement historique ventes", error);
@@ -133,7 +133,7 @@ function Caisse() {
     const idStructure = getStructureId();
     if (!idStructure) return;
     try {
-      const response = await axios.get("http://192.168.100.34:3000/api/abonnement", getAxiosConfig());
+      const response = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/abonnement", getAxiosConfig());
       setAbonnements(response.data);
     } catch (error) {
       console.error("Erreur de chargement des abonnements", error);
@@ -268,7 +268,7 @@ function Caisse() {
 
   const handleOuvrirFacture = async (vente) => {
     try {
-      const res = await axios.get(`http://192.168.100.34:3000/api/vente/details/${vente.id_vente}`, getAxiosConfig());
+      const res = await axios.get(`https://pharmacie-production-9a16.up.railway.app/api/vente/details/${vente.id_vente}`, getAxiosConfig());
       setVenteSelectionnee({
         ...vente,
         items: res.data
@@ -313,7 +313,7 @@ function Caisse() {
 
     try {
       const resVente = await axios.post(
-        "http://192.168.100.34:3000/api/vente", 
+        "https://pharmacie-production-9a16.up.railway.app/api/vente", 
         payload, 
         { headers: { "id_structure": idStructure } }
       );
@@ -349,7 +349,7 @@ function Caisse() {
   const headerData = useMemo(() => {
     let logo = structureInfo?.logo || null;
     if (logo && !logo.startsWith("http") && !logo.startsWith("data:")) {
-      logo = `http://192.168.100.34:3000/${logo}`;
+      logo = `https://pharmacie-production-9a16.up.railway.app/${logo}`;
     }
     return {
       logo: logo,
