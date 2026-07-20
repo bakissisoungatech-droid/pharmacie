@@ -179,21 +179,27 @@ router.delete("/:id", async (req, res) => {
 
 // --- 6. CONNEXION STRUCTURE (CORRIGÉE SANS CRASH) ---
 router.post("/connexion", async (req, res) => {
-  const { nom, mdp } = req.body;
+  console.log("=== REQUÊTE CONNEXION REÇUE ===");
+  console.log("Body reçu :", req.body);
+
+  const { nom, mdp } = req.body || {};
 
   try {
     if (!nom || !mdp) {
+      console.log("Nom ou mot de passe manquant dans le body");
       return res.status(400).json({ 
         success: false, 
         message: "Veuillez fournir le nom et le mot de passe." 
       });
     }
 
-    // Syntax classique et standard de pg pour éviter le crash du driver
+    // Requête SQL
     const result = await pool.query(
       "SELECT * FROM structures WHERE nom = $1",
       [nom]
     );
+
+    console.log("Résultat SQL structures trouvées :", result.rows.length);
 
     if (result.rows.length === 0) {
       return res.status(401).json({ success: false, message: "Identifiants invalides." });
@@ -228,10 +234,11 @@ router.post("/connexion", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Erreur Connexion Structure:", err);
+    console.error("🔴 ERREUR CATCH CONNEXION :", err);
     return res.status(500).json({ 
       success: false, 
-      error: "Erreur interne du serveur: " + err.message 
+      error: "Erreur interne du serveur",
+      details: err.message 
     });
   }
 });
