@@ -202,34 +202,68 @@ router.delete("/:id", async (req, res) => {
 // --- 6. CONNEXION INTERDICTION SI DESACTIVÉE ---
 router.post("/connexion", async (req, res) => {
   const { nom, mdp } = req.body;
+
   try {
-    const result = await pool.query("SELECT * FROM structures WHERE nom = $1", [nom]);
-    
+    // 1. Validation de base des entrées
+    if (!nom || !mdp) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Veuillez fournir le nom et le mot de passe." 
+      });
+    }
+
+    // 2. Requête SQL avec timeout pour éviter les requêtes pendantes
+    const result = await pool.query({
+      text: "SELECT * FROM structures WHERE nom = $1",
+      values: [nom],
+      query_timeout: 5000
+    });
+
     if (result.rows.length === 0) {
       return res.status(401).json({ success: false, message: "Identifiants invalides." });
     }
 
     const structure = result.rows[0];
 
-    // Vérification immédiate du patch d'activation
-    if (!structure.actif) {
-      return res.status(403).json({ success: false, message: "Ce terminal/structure a été suspendu par l'administration." });
+    // 3. Vérification de l'état d'activation
+    if (structure.actif === false) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Ce terminal/structure a été suspendu par l'administration." 
+      });
     }
 
-    const mdpValide = await bcrypt.compare(mdp, structure.mdp);
+    // 4. Verification sécurisée du mot de passe
+    const hashEnBase = structure.mdp || "";
+    let mdpValide = false;
+
+    // Si le mot de passe dans la BD est hashé avec bcrypt (commence par $2a$, $2b$ ou $2y$)
+    if (hashEnBase.startsWith("$2")) {
+      mdpValide = await bcrypt.compare(mdp, hashEnBase);
+    } else {
+      // Comparaison directe si le mot de passe en BD est encore en texte clair
+      mdpValide = (mdp === hashEnBase);
+    }
+
     if (!mdpValide) {
       return res.status(401).json({ success: false, message: "Identifiants invalides." });
     }
 
-    res.json({
+    // 5. Succès
+    return res.json({
       success: true,
       structureId: structure.id_structure,
       nom: structure.nom
     });
+
   } catch (err) {
-    console.error("Erreur Connexion Structure:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("Erreur Connexion Structure:", err);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Erreur interne du serveur: " + err.message 
+    });
   }
 });
+
 
 module.exports = router;
