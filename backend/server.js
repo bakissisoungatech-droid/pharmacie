@@ -51,8 +51,8 @@ app.use("/api/recherche", require("./routes/recherche"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 
 // 7. Lancement du serveur sur le port attribué par Railway
-const PORT = process.env.PORT || process.env.PG_PORT_SERVER || 3000;
+const PORT = process.env.PG_PORT_SERVER || 3000;
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Serveur démarré et à l'écoute sur le port ${PORT}`);
 });
