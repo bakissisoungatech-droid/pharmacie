@@ -12,6 +12,13 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000 // Abandonne au bout de 5 sec si la BD ne répond pas au lieu de bloquer des minutes
 });
 
+pool.on("connect", () => {
+  console.log("🟢 Connecté à la base de données PostgreSQL");
+});
+
+pool.on("error", (err) => {
+  console.error("🔴 Erreur inattendue sur le pool PostgreSQL :", err);
+});
 // const pool = new Pool({
 //   user: process.env.PG_USER,
 //   host: process.env.PG_HOST,
