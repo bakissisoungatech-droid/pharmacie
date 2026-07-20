@@ -59,8 +59,8 @@ function ProduitsEtStock() {
     if (!idStructure) return;
     try {
       const [resProd, resAlertes] = await Promise.all([
-        axios.get("https://pharmacie-production-9a16.up.railway.app/api/produit", getAxiosConfig()),
-        axios.get("https://pharmacie-production-9a16.up.railway.app/api/lots/alertes-peremption", getAxiosConfig())
+        axios.get("postgres-production-2352.up.railway.app/api/produit", getAxiosConfig()),
+        axios.get("postgres-production-2352.up.railway.app/api/lots/alertes-peremption", getAxiosConfig())
       ]);
       
       setData(resProd.data);
@@ -98,7 +98,7 @@ function ProduitsEtStock() {
   const loadLotsDuProduit = async (idProduit) => {
     try {
       // NOTE: Ajuste l'URL si ta route backend pour lister les lots d'un produit est différente
-      const res = await axios.get(`https://pharmacie-production-9a16.up.railway.app/api/lots/produit/${idProduit}`, getAxiosConfig());
+      const res = await axios.get(`postgres-production-2352.up.railway.app/api/lots/produit/${idProduit}`, getAxiosConfig());
       setLotsDuProduit(res.data);
     } catch (error) {
       console.error("Erreur chargement des lots du produit", error);
@@ -120,9 +120,9 @@ function ProduitsEtStock() {
 
     try {
       if (editId) {
-        await axios.put(`https://pharmacie-production-9a16.up.railway.app/api/produit/update/${editId}`, payload, getAxiosConfig());
+        await axios.put(`postgres-production-2352.up.railway.app/api/produit/update/${editId}`, payload, getAxiosConfig());
       } else {
-        await axios.post("https://pharmacie-production-9a16.up.railway.app/api/produit", payload, getAxiosConfig());
+        await axios.post("postgres-production-2352.up.railway.app/api/produit", payload, getAxiosConfig());
       }
       resetFormProduit();
       loadToutesDonnees();
@@ -156,7 +156,7 @@ function ProduitsEtStock() {
     const code = prompt("⚠️ SUPPRESSION DU PRODUIT ET DE SES LOTS ⚠️\nTapez 'CONFIRMER' :");
     if (code === "CONFIRMER") {
       try {
-        await axios.delete(`https://pharmacie-production-9a16.up.railway.app/api/produit/delete/${id}`, getAxiosConfig());
+        await axios.delete(`postgres-production-2352.up.railway.app/api/produit/delete/${id}`, getAxiosConfig());
         loadToutesDonnees();
         alert("Produit et tous ses lots associés ont été supprimés.");
       } catch (error) {
@@ -205,11 +205,11 @@ function ProduitsEtStock() {
     try {
       if (editLotId) {
         // En cas de modification d'un lot existant
-        await axios.put(`https://pharmacie-production-9a16.up.railway.app/api/lots/update/${editLotId}`, payload, getAxiosConfig());
+        await axios.put(`postgres-production-2352.up.railway.app/api/lots/update/${editLotId}`, payload, getAxiosConfig());
         alert("Informations du lot corrigées avec succès !");
       } else {
         // En cas de création de lot (Arrivage normal)
-        await axios.post("https://pharmacie-production-9a16.up.railway.app/api/lots", payload, getAxiosConfig());
+        await axios.post("postgres-production-2352.up.railway.app/api/lots", payload, getAxiosConfig());
         alert(`Arrivage de ${quantiteDisponible} unité(s) validé pour : ${selectedProduit?.nom}`);
       }
       
@@ -229,7 +229,7 @@ function ProduitsEtStock() {
     if (!window.confirm("⚠️ ATTENTION ! Voulez-vous supprimer définitivement ce lot du stock ? Cette action écrasera ses données.")) return;
     
     try {
-      await axios.delete(`https://pharmacie-production-9a16.up.railway.app/api/lots/delete/${id_lot}`, getAxiosConfig());
+      await axios.delete(`postgres-production-2352.up.railway.app/api/lots/delete/${id_lot}`, getAxiosConfig());
       alert("Lot supprimé définitivement.");
       resetFormLot();
       loadLotsDuProduit(selectedProduit.id_produit);
@@ -243,7 +243,7 @@ function ProduitsEtStock() {
     if (!window.confirm("Confirmez-vous la mise au rebut de ce lot ? Sa quantité passera à 0.")) return;
     try {
       await axios.post(
-        `https://pharmacie-production-9a16.up.railway.app/api/lots/retrait-perime/${id_lot}`,
+        `postgres-production-2352.up.railway.app/api/lots/retrait-perime/${id_lot}`,
         { id_utilisateur: currentUser?.id_utilisateur, motif: "Retrait via interface unifiée" },
         getAxiosConfig()
       );

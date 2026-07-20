@@ -67,7 +67,7 @@ function GestionStructures() {
 
   const loadData = useCallback(async () => {
     try {
-      const response = await axios.get(`https://pharmacie-production-9a16.up.railway.app/api/structure`);
+      const response = await axios.get(`https://postgres-production-2352.up.railway.app/api/structure`);
       setData(response.data);
     } catch (error) {
       console.error("Erreur de chargement des structures", error);
@@ -120,11 +120,11 @@ function GestionStructures() {
 
     try {
       if (editId) {
-        await axios.put(`https://pharmacie-production-9a16.up.railway.app/api/structure/${editId}`, formData);
+        await axios.put(`https://postgres-production-2352.up.railway.app/api/structure/${editId}`, formData);
         alert("Structure mise à jour !");
       } else {
         if (!mdp) { alert("Le mot de passe est obligatoire à la création"); return; }
-        await axios.post(`https://pharmacie-production-9a16.up.railway.app/api/structure/post`, formData);
+        await axios.post(`https://postgres-production-2352.up.railway.app/api/structure/post`, formData);
         alert("Structure créée !");
       }
       
@@ -157,7 +157,7 @@ function GestionStructures() {
 
   const handleToggleActif = async (id) => {
     try {
-      await axios.patch(`https://pharmacie-production-9a16.up.railway.app/api/structure/${id}/toggle-actif`);
+      await axios.patch(`https://postgres-production-2352.up.railway.app/api/structure/${id}/toggle-actif`);
       if (currentStructureId === id) {
         handleLogoutStructure();
       }
@@ -170,7 +170,7 @@ function GestionStructures() {
   const handleDelete = async (id) => {
     if (window.confirm("Voulez-vous vraiment supprimer cette structure ?")) {
       try {
-        await axios.delete(`https://pharmacie-production-9a16.up.railway.app/api/structure/${id}`);
+        await axios.delete(`https://postgres-production-2352.up.railway.app/api/structure/${id}`);
         if (currentStructureId === id) handleLogoutStructure();
         loadData();
       } catch (error) {
@@ -196,7 +196,7 @@ function GestionStructures() {
   const handleLoginStructure = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post(`https://pharmacie-production-9a16.up.railway.app/api/structure/connexion`, {
+      const response = await axios.post(`https://postgres-production-2352.up.railway.app/api/structure/connexion`, {
         nom: loginNom,
         mdp: loginMdp
       });
