@@ -16,6 +16,10 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*" }
 });
+app.use(cors({
+  origin: ["https://bakissi.up.railway.app", "http://localhost:5173"],
+  credentials: true
+}));
 
 require("./socket")(io);
 
