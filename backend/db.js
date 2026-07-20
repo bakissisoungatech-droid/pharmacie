@@ -2,7 +2,7 @@ const { Pool } = require("pg");
 require('dotenv').config();
 
 // On récupère l'URL complète de la base de données
-const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+const connectionString = process.env.PG_DATABASE ;
 
 const pool = new Pool({
   connectionString: connectionString,
