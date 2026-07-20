@@ -62,7 +62,7 @@ function Dashboard() {
     if (!idLocalStorage) return;
 
     try {
-      const r = await axios.get("https://postgres-production-2352.up.railway.app/api/structure", getAxiosConfig());
+      const r = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/structure", getAxiosConfig());
       
       if (r.data && Array.isArray(r.data)) {
         const structureTrouvee = r.data.find(
@@ -97,7 +97,7 @@ function Dashboard() {
     const idStructure = getStructureId();
     if (!idStructure) return;
     try {
-      const r = await axios.get("https://postgres-production-2352.up.railway.app/api/dashboard/stats", getAxiosConfig());
+      const r = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/dashboard/stats", getAxiosConfig());
       setStats(r.data);
     } catch (error) {
       console.error("Erreur chargement statistiques dashboard", error);
@@ -108,7 +108,7 @@ function Dashboard() {
     const idStructure = getStructureId();
     if (!idStructure) return;
     try {
-      const r = await axios.get("https://postgres-production-2352.up.railway.app/api/dashboard/entrees", getAxiosConfig());
+      const r = await axios.get("https://pharmacie-production-9a16.up.railway.app/api/dashboard/entrees", getAxiosConfig());
       setEntreesStock(r.data);
     } catch (error) {
       console.error("Erreur chargement entrées de stock", error);

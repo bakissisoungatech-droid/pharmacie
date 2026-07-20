@@ -48,7 +48,7 @@ function Abonnement() {
     const loadData = useCallback(async () => {
         if (!currentUser?.id_structure) return;
         try {
-            const response = await axios.get(`postgres-production-2352.up.railway.app/api/abonnement`, getAxiosConfig());
+            const response = await axios.get(`https://pharmacie-production-9a16.up.railway.app/api/abonnement`, getAxiosConfig());
             setData(response.data);
         } catch (error) {
             console.error("Erreur de chargement des données", error);
@@ -84,9 +84,9 @@ function Abonnement() {
 
         try {
             if (editId) {
-                await axios.put(`postgres-production-2352.up.railway.app/api/abonnement/${editId}`, formData, getAxiosConfig());
+                await axios.put(`https://pharmacie-production-9a16.up.railway.app/api/abonnement/${editId}`, formData, getAxiosConfig());
             } else {
-                await axios.post(`postgres-production-2352.up.railway.app/api/abonnement/post`, formData, getAxiosConfig());
+                await axios.post(`https://pharmacie-production-9a16.up.railway.app/api/abonnement/post`, formData, getAxiosConfig());
             }
             
             setNom("");
@@ -106,7 +106,7 @@ function Abonnement() {
     const handleDelete = async (id_abonnement) => {
         if (window.confirm("Voulez-vous vraiment supprimer cet abonnement ?")) {
             try {
-                await axios.delete(`postgres-production-2352.up.railway.app/api/abonnement/${id_abonnement}`, getAxiosConfig());
+                await axios.delete(`https://pharmacie-production-9a16.up.railway.app/api/abonnement/${id_abonnement}`, getAxiosConfig());
                 loadData();
             } catch (error) {
                 console.error("Erreur lors de la suppression", error);
