@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
+require('dotenv').config();
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -30,4 +31,4 @@ app.use("/api/vente", require("./routes/vente"));
 app.use("/api/recherche", require("./routes/recherche"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 
-server.listen(PG_PORT_SERVER, () => console.log("Serveur lancé"));
+server.listen(PG_PORT_SERVER || 3000, () => console.log("Serveur lancé"));
