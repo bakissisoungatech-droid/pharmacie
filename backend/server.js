@@ -30,4 +30,4 @@ app.use("/api/vente", require("./routes/vente"));
 app.use("/api/recherche", require("./routes/recherche"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 
-server.listen(3000, () => console.log("Serveur lancé"));
+server.listen(PG_PORT_SERVER, () => console.log("Serveur lancé"));
