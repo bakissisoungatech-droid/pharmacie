@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   if (allowedRoles && !allowedRoles.includes(user?.role?.toLowerCase())) {
     // Si c'est un proprio qui s'est égaré ailleurs
     if (user?.role?.toLowerCase() === "proprio") {
-      return <Navigate to="/gestion1" replace />;
+      return <Navigate to="/gestionnaire" replace />;
     }
     
     // Si c'est un utilisateur standard avec un rôle valide mais pas sur la bonne page
