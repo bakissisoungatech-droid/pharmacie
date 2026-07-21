@@ -32,7 +32,7 @@ export default function Login() {
 
         // Redirection dynamique basée sur le rôle
         if (roleUtilisateur === "proprio") {
-          navigate("/gestion1");
+          navigate("/gestionnaire");
         } else {
           navigate("/gestion");
         }
