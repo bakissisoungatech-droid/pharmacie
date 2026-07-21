@@ -6,10 +6,14 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
 function ProduitsEtStock() {
-  // --- ÉTATS GLOBAUX ---
+  // --- ÉTATS GLOBAUX & SESSION ---
   const [data, setData] = useState([]);
   const [alertesPeremption, setAlertesPeremption] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+
+  const [activePage, setActivePage] = useState(() => {
+    return sessionStorage.getItem("activePage") || "dashboard";
+  });
 
   // --- ÉTATS FORMULAIRE PRODUIT (CATALOGUE) ---
   const [nom, setNom] = useState("");
@@ -19,11 +23,11 @@ function ProduitsEtStock() {
 
   // --- ÉTATS FORMULAIRE ARRIVAGE / GESTION LOTS ---
   const [selectedProduit, setSelectedProduit] = useState(null); 
-  const [lotsDuProduit, setLotsDuProduit] = useState([]); // Liste des lots du produit sélectionné
+  const [lotsDuProduit, setLotsDuProduit] = useState([]);
   const [quantiteDisponible, setQuantiteDisponible] = useState("");
   const [datePeremption, setDatePeremption] = useState("");
   const [prixAchatUnitaire, setPrixAchatUnitaire] = useState("");
-  const [editLotId, setEditLotId] = useState(null); // ID du lot en cours de modification
+  const [editLotId, setEditLotId] = useState(null);
 
   // --- RECHERCHE, FILTRES & COLLAPSE ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,9 +35,9 @@ function ProduitsEtStock() {
   const [sortConfig, setSortConfig] = useState({ key: "nom", direction: "asc" });
   const [showPeremptionCollapse, setShowPeremptionCollapse] = useState(false);
 
-  // 1. Récupération de l'utilisateur connecté
+  // 1. Récupération de l'utilisateur connecté depuis sessionStorage
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
+    const storedUser = sessionStorage.getItem("user");
     if (storedUser) {
       try {
         setCurrentUser(JSON.parse(storedUser));
@@ -43,8 +47,14 @@ function ProduitsEtStock() {
     }
   }, []);
 
+  // Synchronisation de la page active avec sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem("activePage", activePage);
+  }, [activePage]);
+
+  // Récupération de l'identifiant de structure depuis sessionStorage ou l'objet user
   const getStructureId = useCallback(() => {
-    return localStorage.getItem("id_structure") || currentUser?.id_structure;
+    return sessionStorage.getItem("id_structure") || currentUser?.id_structure;
   }, [currentUser]);
 
   const getAxiosConfig = useCallback(() => {
@@ -52,6 +62,17 @@ function ProduitsEtStock() {
     if (!idStructure) return {};
     return { headers: { "id_structure": idStructure } };
   }, [getStructureId]);
+
+  // --- CHARGER LES LOTS D'UN PRODUIT SPÉCIFIQUE ---
+  const loadLotsDuProduit = useCallback(async (idProduit) => {
+    if (!idProduit) return;
+    try {
+      const res = await axios.get(`https://pharmacie-production-9a16.up.railway.app/api/lots/produit/${idProduit}`, getAxiosConfig());
+      setLotsDuProduit(res.data);
+    } catch (error) {
+      console.error("Erreur chargement des lots du produit", error);
+    }
+  }, [getAxiosConfig]);
 
   // --- CHARGEMENT SYNCHRONISÉ DES DONNÉES ---
   const loadToutesDonnees = useCallback(async () => {
@@ -82,7 +103,6 @@ function ProduitsEtStock() {
 
     const handleRefresh = () => {
       loadToutesDonnees();
-      // Si la modale est ouverte pour un produit, on rafraîchit aussi ses lots
       if (selectedProduit) {
         loadLotsDuProduit(selectedProduit.id_produit);
       }
@@ -92,18 +112,7 @@ function ProduitsEtStock() {
     return () => {
       socket.off("refresh_data", handleRefresh);
     };
-  }, [getStructureId, loadToutesDonnees, selectedProduit]);
-
-  // --- CHARGER LES LOTS D'UN PRODUIT SPÉCIFIQUE ---
-  const loadLotsDuProduit = async (idProduit) => {
-    try {
-      // NOTE: Ajuste l'URL si ta route backend pour lister les lots d'un produit est différente
-      const res = await axios.get(`https://pharmacie-production-9a16.up.railway.app/api/lots/produit/${idProduit}`, getAxiosConfig());
-      setLotsDuProduit(res.data);
-    } catch (error) {
-      console.error("Erreur chargement des lots du produit", error);
-    }
-  };
+  }, [getStructureId, loadToutesDonnees, loadLotsDuProduit, selectedProduit]);
 
   // --- ACTIONS DU CATALOGUE (PRODUITS) ---
   const submitProduit = async (e) => {
@@ -148,8 +157,9 @@ function ProduitsEtStock() {
   };
 
   const handleDeleteProduit = async (id) => {
-    const rolesAutorises = ["Admin", "Pharmacien", "Proprio"];
-    if (!rolesAutorises.includes(currentUser?.role)) {
+    const roleUser = currentUser?.role?.toLowerCase();
+    const rolesAutorises = ["admin", "pharmacien", "proprio"];
+    if (!rolesAutorises.includes(roleUser)) {
       return alert("Accès refusé : Autorisation insuffisante.");
     }
 
@@ -160,7 +170,7 @@ function ProduitsEtStock() {
         loadToutesDonnees();
         alert("Produit et tous ses lots associés ont été supprimés.");
       } catch (error) {
-        alert("Impossible de supprimer le produit.");
+        alert("Impossible de supprimer le produit : " + (error.response?.data?.error || error.message));
       }
     }
   };
@@ -182,7 +192,6 @@ function ProduitsEtStock() {
   const startEditLot = (lot) => {
     setEditLotId(lot.id_lot);
     setQuantiteDisponible(lot.quantite_disponible);
-    // Formater la date au format YYYY-MM-DD pour le champ type="date"
     const dateFormatted = lot.date_peremption ? lot.date_peremption.split('T')[0] : "";
     setDatePeremption(dateFormatted);
     setPrixAchatUnitaire(lot.prix_achat_unitaire || "");
@@ -204,11 +213,9 @@ function ProduitsEtStock() {
 
     try {
       if (editLotId) {
-        // En cas de modification d'un lot existant
         await axios.put(`https://pharmacie-production-9a16.up.railway.app/api/lots/update/${editLotId}`, payload, getAxiosConfig());
         alert("Informations du lot corrigées avec succès !");
       } else {
-        // En cas de création de lot (Arrivage normal)
         await axios.post("https://pharmacie-production-9a16.up.railway.app/api/lots", payload, getAxiosConfig());
         alert(`Arrivage de ${quantiteDisponible} unité(s) validé pour : ${selectedProduit?.nom}`);
       }
@@ -222,7 +229,8 @@ function ProduitsEtStock() {
   };
 
   const handleDeleteLot = async (id_lot) => {
-    if (!["Admin", "Pharmacien"].includes(currentUser?.role)) {
+    const roleUser = currentUser?.role?.toLowerCase();
+    if (!["admin", "pharmacien", "proprio"].includes(roleUser)) {
       return alert("Droits insuffisants pour supprimer définitivement un lot.");
     }
 
@@ -454,7 +462,8 @@ function ProduitsEtStock() {
                         📦 Gérer Lots / Arrivage
                       </button>
                       <button onClick={() => startEdit(p)} className="btn btn-warning btn-sm">Modifier</button>
-                      {["Admin", "Pharmacien"].includes(currentUser?.role) && (
+                      {/* Affichage conditionnel normalisé en minuscules */}
+                      {["admin", "pharmacien", "proprio"].includes(currentUser?.role?.toLowerCase()) && (
                         <button onClick={() => handleDeleteProduit(p.id_produit)} className="btn btn-danger btn-sm">Supprimer</button>
                       )}
                     </div>
@@ -471,9 +480,9 @@ function ProduitsEtStock() {
         </table>
       </div>
 
-      {/* --- MODALE BOOTSTRAP UNIFIÉE : ARRIVAGES, MODIFICATIONS & SUPPRESSION LOTS --- */}
+      {/* --- MODALE BOOTSTRAP UNIFIÉE --- */}
       <div className="modal fade" id="arrivageModal" tabIndex="-1" aria-labelledby="arrivageModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered modal-lg"> {/* Agrandie en modal-lg pour accueillir la table */}
+        <div className="modal-dialog modal-dialog-centered modal-lg">
           <div className="modal-content border-success">
             <div className="modal-header bg-success text-white">
               <h5 className="modal-title fw-bold" id="arrivageModalLabel">
@@ -510,7 +519,7 @@ function ProduitsEtStock() {
                   </button>
                 </div>
 
-                {/* --- SOUS-SECTION : LISTE DE TOUS LES LOTS EN STOCK POUR CE PRODUIT --- */}
+                {/* --- SOUS-SECTION : LISTE DES LOTS --- */}
                 <h6 className="fw-bold text-dark mt-2 mb-2">📋 Lots actuellement enregistrés pour ce produit :</h6>
                 <div className="table-responsive border rounded" style={{ maxHeight: "200px" }}>
                   <table className="table table-sm table-striped hover align-middle mb-0" style={{ fontSize: '13px' }}>
@@ -531,7 +540,7 @@ function ProduitsEtStock() {
                           <td className="text-end">
                             <div className="btn-group shadow-sm">
                               <button type="button" className="btn btn-warning btn-sm py-0" onClick={() => startEditLot(lot)}>✏️</button>
-                              {["Admin", "Pharmacien"].includes(currentUser?.role) && (
+                              {["admin", "pharmacien", "proprio"].includes(currentUser?.role?.toLowerCase()) && (
                                 <button type="button" className="btn btn-danger btn-sm py-0" onClick={() => handleDeleteLot(lot.id_lot)}>🗑️</button>
                               )}
                             </div>

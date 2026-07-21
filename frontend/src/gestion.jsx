@@ -138,7 +138,18 @@ function GestionPharmacie() {
       >
         <div className="d-md-none" style={{ height: "45px" }}></div>
 
-        <a href={logo} target="_blank" rel="noopener noreferrer"><img src={logo}  alt="" style={{width: "25vh"}}/></a>
+        <a href={logo} target="_blank" rel="noopener noreferrer" className="d-inline-block w-100">
+          <img 
+            src={logo} 
+            alt="Logo" 
+            style={{ 
+              width: "100%", 
+              height: "auto", 
+              maxHeight: "25vh", 
+              objectFit: "contain" 
+            }}
+          />
+        </a>
         {/* <h4 className="text-center mb-4 fw-bold text-success border-bottom pb-3">BAKISSI</h4> */}
 
         <div className="mb-3 text-center">
