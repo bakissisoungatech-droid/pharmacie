@@ -227,14 +227,14 @@ function GestionPharmacie() {
                       • Enrôler du Personnel (Admin)
                     </button>
                   </li>
-                  <li>
+                  {/* <li>
                     <button
                       onClick={() => handlePageChange("structures")}
                       className={`nav-link w-100 text-start text-white-50 btn btn-sm border-0 py-1 ${activePage === "structures" ? "text-success fw-bold" : ""}`}
                     >
                       • Gestion Structures (Admin)
                     </button>
-                  </li>
+                  </li> */}
                   <li className="nav-item mt-1">
                     <button
                       onClick={() => handlePageChange("login")}

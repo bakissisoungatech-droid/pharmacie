@@ -29,7 +29,7 @@ let router = createBrowserRouter([
     ),
   },
   {
-    path: "/gestion1",
+    path: "/gestionnaire",
     element: (
       <ProtectedRoute allowedRoles={["proprio"]}>
         <Gestion1 />
