@@ -229,46 +229,24 @@ function ProduitsEtStock() {
   };
 
   const handleDeleteLot = async (id_lot) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce lot ?")) return;
+
     try {
-      const response = await fetch(`https://pharmacie-production-9a16.up.railway.app/api/lots/${id_lot}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          "id_structure": userStructureId // Transmettre l'id_structure dans le header
-        },
-        body: JSON.stringify({
-          id_utilisateur: currentUserId,
-          motif: "Erreur d'encodage"
-        })
-      });
+      const res = await axios.delete(
+        `https://pharmacie-production-9a16.up.railway.app/api/lots/${id_lot}`,
+        getAxiosConfig()
+      );
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      alert(res.data.message || "Lot supprimé.");
 
-      console.log("Succès :", data.message);
+      if (selectedProduit) {
+        loadLotsDuProduit(selectedProduit.id_produit);
+      }
+      loadToutesDonnees();
     } catch (error) {
-      console.error("Erreur :", error.message);
+      alert("Impossible de supprimer le lot : " + (error.response?.data?.error || error.message));
     }
   };
-
-  // const handleDeleteLot = async (id_lot) => {
-  //   const roleUser = currentUser?.role?.toLowerCase();
-  //   if (!["admin", "pharmacien", "proprio"].includes(roleUser)) {
-  //     return alert("Droits insuffisants pour supprimer définitivement un lot.");
-  //   }
-
-  //   if (!window.confirm("⚠️ ATTENTION ! Voulez-vous supprimer définitivement ce lot du stock ? Cette action écrasera ses données.")) return;
-    
-  //   try {
-  //     await axios.delete(`https://pharmacie-production-9a16.up.railway.app/api/lots/delete/${id_lot}`, getAxiosConfig());
-  //     alert("Lot supprimé définitivement.");
-  //     resetFormLot();
-  //     loadLotsDuProduit(selectedProduit.id_produit);
-  //     loadToutesDonnees();
-  //   } catch (error) {
-  //     alert("Erreur lors de la suppression : " + (error.response?.data?.error || error.message));
-  //   }
-  // };
 
   const handleRetraitPerime = async (id_lot) => {
     if (!window.confirm("Confirmez-vous la mise au rebut de ce lot ? Sa quantité passera à 0.")) return;
