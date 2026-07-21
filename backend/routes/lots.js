@@ -155,4 +155,30 @@ router.post("/retrait-perime/:id_lot", async (req, res) => {
   }
 });
 
+// --- 5. SUPPRESSION DÉFINITIVE D'UN LOT DE LA BDD (HARD DELETE) ---
+router.delete("/:id_lot", async (req, res) => {
+  const id_structure = req.headers["id_structure"] || req.query.id_structure;
+  const { id_lot } = req.params;
+
+  if (!id_structure) {
+    return res.status(400).json({ error: "L'identifiant de la structure est requis." });
+  }
+
+  try {
+    const query = "DELETE FROM lots_stock WHERE id_lot = $1 AND id_structure = $2 RETURNING *";
+    const result = await pool.query(query, [id_lot, id_structure]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Lot introuvable ou non autorisé." });
+    }
+
+    notifyRefresh(req);
+    res.json({ success: true, message: "Lot supprimé définitivement de la base de données." });
+  } catch (err) {
+    console.error("Erreur HARD DELETE Lot :", err.message);
+    // Erreur fréquente si des clés étrangères pointent vers ce lot (ex: mouvements_stock)
+    res.status(500).json({ error: "Impossible de supprimer ce lot car il est lié à d'autres enregistrements." });
+  }
+});
+
 module.exports = router;
